@@ -1,0 +1,13 @@
+node_modules
+dist
+coverage
+
+# Environment
+.env
+!.env.example
+
+# Prisma generated client (regenerated via postinstall)
+src/generated/prisma
+
+# Logs
+*.log

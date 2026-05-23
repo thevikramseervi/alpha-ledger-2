@@ -1,0 +1,87 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+  INVESTMENT
+  TRANSFER
+}
+
+enum AccountType {
+  CASH
+  BANK
+  OTHER
+}
+
+model Account {
+  id                  String        @id @default(cuid())
+  name                String        @unique
+  type                AccountType   @default(BANK)
+  balance             Decimal       @default(0) @db.Decimal(12, 2)
+  color               String        @default("#6366f1")
+  transactions        Transaction[] @relation("TransactionAccount")
+  incomingTransfers   Transaction[] @relation("TransferTo")
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+}
+
+model Category {
+  id            String          @id @default(cuid())
+  name          String
+  type          TransactionType
+  color         String          @default("#6366f1")
+  icon          String?
+  subCategories SubCategory[]
+  transactions  Transaction[]
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  @@unique([name, type])
+}
+
+model SubCategory {
+  id           String        @id @default(cuid())
+  name         String
+  categoryId   String
+  category     Category      @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@unique([name, categoryId])
+  @@index([categoryId])
+}
+
+model Transaction {
+  id            String          @id @default(cuid())
+  amount        Decimal         @db.Decimal(12, 2)
+  type          TransactionType
+  accountId     String
+  account       Account         @relation("TransactionAccount", fields: [accountId], references: [id], onDelete: Restrict)
+  toAccountId   String?
+  toAccount     Account?        @relation("TransferTo", fields: [toAccountId], references: [id], onDelete: Restrict)
+  categoryId    String?
+  category      Category?       @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  subCategoryId String?
+  subCategory   SubCategory?    @relation(fields: [subCategoryId], references: [id], onDelete: SetNull)
+  description   String
+  date          DateTime        @db.Date
+  notes         String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  @@index([date])
+  @@index([type])
+  @@index([accountId])
+  @@index([toAccountId])
+  @@index([categoryId])
+  @@index([subCategoryId])
+}
