@@ -64,6 +64,10 @@ This version has breaking changes — APIs, conventions, and file structure may 
   - Entry: `downloadReportsPdfFromParams(params, { mode: 'full' | 'summary', onProgress })`
   - Document: `ReportsPdfDocument` in `reports-pdf-document.tsx`
   - Fonts: Inter registered in `pdf-fonts.ts` (CDN); call `registerPdfFonts()` before render
+- Reports XLSX: `src/lib/reports-xlsx/` (`xlsx` / SheetJS)
+  - Entry: `downloadReportsXlsxFromParams(params, { onProgress })`
+  - Builder: `buildReportsWorkbook()` in `build-reports-xlsx.ts` — multi-sheet full export
+- Shared export fetch: `src/lib/reports-export/fetch-export-package.ts` → `api.reports.exportPackage(...)`
   - Backend must expose `rentalIncomePeriod` and `investmentSummaryPeriod` on export package
 
 ## Dev server

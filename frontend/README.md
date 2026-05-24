@@ -42,7 +42,7 @@ On LAN, the API client automatically targets port `3001` on the same host as the
 | Route | Description |
 |-------|-------------|
 | `/` | Dashboard — KPI cards with MoM/YoY, net worth, cash flow (6M/12M/YTD), budgets, category donut, recent transactions, recurring nudge |
-| `/reports` | Reports — cash flow, categories, tags, net worth, budgets; preset or custom range; CSV + PDF export |
+| `/reports` | Reports — cash flow, categories, tags, net worth, budgets; preset or custom range; CSV, PDF, and XLSX export |
 | `/transactions` | Transaction list, filters (incl. tag), CSV export, due-only recurring banner |
 | `/recurring` | Recurring templates — create, edit, activate/deactivate, post for month |
 | `/accounts` | Monthly statements, balance charts, account CRUD |
@@ -80,14 +80,14 @@ Shared analytics helpers: `src/lib/dashboard-analytics.ts`.
 
 | Component | Purpose |
 |-----------|---------|
-| `reports-page-client.tsx` | Preset vs custom range, export CSV, full/summary PDF, tabbed layout |
+| `reports-page-client.tsx` | Preset vs custom range, export CSV, full/summary PDF, full XLSX, tabbed layout |
 | `reports-cash-flow-tab.tsx` | Period totals, cash flow chart, monthly net savings list |
 | `reports-categories-tab.tsx` | Top categories, trends, sub-category drill-down, stacked bars |
 | `reports-tags-tab.tsx` | Tag breakdown donut and list |
 | `reports-net-worth-tab.tsx` | Net worth trend + account allocation |
 | `reports-budgets-tab.tsx` | Budget hit rate and monthly budget vs spent |
 
-Export: `src/lib/export-reports-csv.ts`, `src/lib/reports-pdf/` (full + summary PDF via `@react-pdf/renderer`), `src/lib/reports-format.ts`.
+Export: `src/lib/export-reports-csv.ts`, `src/lib/reports-pdf/` (PDF), `src/lib/reports-xlsx/` (Excel), `src/lib/reports-export/` (shared fetch), `src/lib/reports-format.ts`.
 
 #### PDF export (`src/lib/reports-pdf/`)
 
@@ -104,6 +104,17 @@ Export: `src/lib/export-reports-csv.ts`, `src/lib/reports-pdf/` (full + summary 
 **Full PDF** includes: period start→end balance snapshot, KPIs, SVG charts, account allocation, monthly account balances with flow detail, category trends and sub-categories, tags, budget period totals, full-period rental/investment, and the complete transaction ledger (color-coded amounts, notes, cleared/pending).
 
 **Summary PDF** omits the transaction ledger; filename gets a `-summary` suffix.
+
+#### XLSX export (`src/lib/reports-xlsx/`)
+
+| File | Purpose |
+|------|---------|
+| `download-reports-xlsx.ts` | Fetches export package and triggers workbook download |
+| `build-reports-xlsx.ts` | Builds multi-sheet workbook via SheetJS (`xlsx`) |
+
+**Workbook sheets:** Report Info, Executive Summary, Cash Flow, Net Worth, Account Allocation, Account Balances, Account Flow Detail, Categories, Category Trends, Sub-Categories, Tags, Budgets Period, Budgets Latest Month, Rental Income, Investments, Transactions, Transaction Splits, Category Monthly (raw), Months Index.
+
+Amounts are numeric cells (INR) for Excel formulas. Uses the same `GET /reports/export-package` payload as PDF.
 
 ### Recurring (`components/recurring/`)
 
@@ -184,6 +195,8 @@ src/
 │   ├── export-transactions-csv.ts  # Transaction CSV (tags column, formula guard)
 │   ├── export-reports-csv.ts       # Report summary CSV
 │   ├── reports-pdf/                # Full + summary PDF export (@react-pdf/renderer)
+│   ├── reports-xlsx/               # Full Excel workbook export (xlsx)
+│   ├── reports-export/             # Shared export-package fetch
 │   ├── reports-format.ts           # Report period labels
 │   ├── format.ts        # INR formatting, date helpers, labels
 │   ├── reconciliation.ts
@@ -212,7 +225,8 @@ Typed methods for all backend resources. Notable:
 - Destructive actions (delete account, category, tag, transaction) use confirmation dialogs
 - Charts via **Recharts** (area, line, bar, pie)
 - `suppressHydrationWarning` on `<html>` / `<body>` for browser extension attributes
-- Reports **PDF export** — **Download full PDF** (includes transaction ledger) or **Summary PDF** (analytics only); built client-side with `@react-pdf/renderer`. Button shows progress while fetching data and rendering. Requires backend `GET /reports/export-package`.
+- Reports **PDF export** — **Download full PDF** or **Summary PDF**; built client-side with `@react-pdf/renderer`
+- Reports **XLSX export** — **Download XLSX**; full multi-sheet workbook via SheetJS; same export-package API as PDF
 
 ## Troubleshooting
 

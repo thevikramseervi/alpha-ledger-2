@@ -1,3 +1,4 @@
+import { fetchReportsExportPackage } from '@/lib/reports-export/fetch-export-package';
 import { registerPdfFonts } from '@/lib/reports-pdf/pdf-fonts';
 import { pdfFilename } from '@/lib/reports-pdf/pdf-format';
 import {
@@ -14,17 +15,12 @@ export type ReportsExportParams = {
   toDate?: string;
 };
 
+export { fetchReportsExportPackage };
+
 export type ReportsPdfDownloadOptions = {
   mode?: ReportsPdfMode;
   onProgress?: (message: string) => void;
 };
-
-export async function fetchReportsExportPackage(
-  params: ReportsExportParams,
-): Promise<ReportsExportPackage> {
-  const { api } = await import('@/lib/api');
-  return api.reports.exportPackage(params);
-}
 
 export async function downloadReportsPdf(
   data: ReportsExportPackage,

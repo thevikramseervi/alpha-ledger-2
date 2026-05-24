@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Download, FileDown } from "lucide-react";
+import { Download, FileDown, FileSpreadsheet } from "lucide-react";
 import { toast } from "sonner";
 import { ChartRangeToggle } from "@/components/dashboard/chart-range-toggle";
 import { ReportsBudgetsTab } from "@/components/reports/reports-budgets-tab";
@@ -20,6 +20,7 @@ import { DashboardChartRange } from "@/lib/dashboard-analytics";
 import { exportReportsToCsv } from "@/lib/export-reports-csv";
 import { getCurrentPeriod } from "@/lib/format";
 import { downloadReportsPdfFromParams } from "@/lib/reports-pdf/download-reports-pdf";
+import { downloadReportsXlsxFromParams } from "@/lib/reports-xlsx/download-reports-xlsx";
 import { getReportsPeriodLabel } from "@/lib/reports-format";
 import { ReportsOverview } from "@/types";
 
@@ -44,8 +45,8 @@ export function ReportsPageClient() {
   const [overview, setOverview] = useState<ReportsOverview | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [pdfDownloading, setPdfDownloading] = useState(false);
-  const [pdfProgress, setPdfProgress] = useState<string | null>(null);
+  const [exportBusy, setExportBusy] = useState(false);
+  const [exportProgress, setExportProgress] = useState<string | null>(null);
 
   const usingCustomRange = periodMode === "custom";
 
@@ -105,22 +106,21 @@ export function ReportsPageClient() {
     toast.success("Report exported as CSV");
   };
 
+  const exportParams = usingCustomRange
+    ? {
+        fromDate,
+        toDate: toDate || fromDate,
+      }
+    : { year, month, range };
+
   const handleDownloadPdf = async (mode: "full" | "summary") => {
-    setPdfDownloading(true);
-    setPdfProgress(null);
+    setExportBusy(true);
+    setExportProgress(null);
     try {
-      await downloadReportsPdfFromParams(
-        usingCustomRange
-          ? {
-              fromDate,
-              toDate: toDate || fromDate,
-            }
-          : { year, month, range },
-        {
-          mode,
-          onProgress: setPdfProgress,
-        },
-      );
+      await downloadReportsPdfFromParams(exportParams, {
+        mode,
+        onProgress: setExportProgress,
+      });
       toast.success(
         mode === "summary" ? "Summary PDF downloaded" : "Full report PDF downloaded",
       );
@@ -128,8 +128,25 @@ export function ReportsPageClient() {
       toastApiError("Failed to generate PDF report", error);
       logApiError("Reports PDF export failed", error);
     } finally {
-      setPdfDownloading(false);
-      setPdfProgress(null);
+      setExportBusy(false);
+      setExportProgress(null);
+    }
+  };
+
+  const handleDownloadXlsx = async () => {
+    setExportBusy(true);
+    setExportProgress(null);
+    try {
+      await downloadReportsXlsxFromParams(exportParams, {
+        onProgress: setExportProgress,
+      });
+      toast.success("Full report XLSX downloaded");
+    } catch (error) {
+      toastApiError("Failed to generate XLSX report", error);
+      logApiError("Reports XLSX export failed", error);
+    } finally {
+      setExportBusy(false);
+      setExportProgress(null);
     }
   };
 
@@ -192,11 +209,11 @@ export function ReportsPageClient() {
               type="button"
               size="sm"
               onClick={() => void handleDownloadPdf("full")}
-              disabled={loading || pdfDownloading}
+              disabled={loading || exportBusy}
             >
               <FileDown className="mr-2 h-4 w-4" />
-              {pdfDownloading
-                ? pdfProgress ?? "Building PDF…"
+              {exportBusy
+                ? exportProgress ?? "Exporting…"
                 : "Download full PDF"}
             </Button>
             <Button
@@ -204,17 +221,27 @@ export function ReportsPageClient() {
               variant="outline"
               size="sm"
               onClick={() => void handleDownloadPdf("summary")}
-              disabled={loading || pdfDownloading}
+              disabled={loading || exportBusy}
             >
               <FileDown className="mr-2 h-4 w-4" />
-              {pdfDownloading && pdfProgress ? pdfProgress : "Summary PDF"}
+              {exportBusy && exportProgress ? exportProgress : "Summary PDF"}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => void handleDownloadXlsx()}
+              disabled={loading || exportBusy}
+            >
+              <FileSpreadsheet className="mr-2 h-4 w-4" />
+              {exportBusy && exportProgress ? exportProgress : "Download XLSX"}
             </Button>
             <Button
               type="button"
               variant="outline"
               size="sm"
               onClick={handleExportCsv}
-              disabled={loading || !overview}
+              disabled={loading || !overview || exportBusy}
             >
               <Download className="mr-2 h-4 w-4" />
               Export CSV
