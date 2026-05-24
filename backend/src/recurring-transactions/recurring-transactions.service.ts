@@ -13,6 +13,7 @@ import {
   UpdateRecurringTransactionDto,
 } from './dto/recurring-transaction.dto';
 import { CreateTransactionDto } from '../transactions/dto/transaction.dto';
+import { interactiveTransactionOptions } from '../common/interactive-transaction-options';
 
 const recurringInclude = {
   account: true,
@@ -167,7 +168,8 @@ export class RecurringTransactionsService {
 
     await this.transactionsService.validateForCreate(createDto);
 
-    return this.prisma.$transaction(async (tx) => {
+    return this.prisma.$transaction(
+      async (tx) => {
       const claimed = await tx.recurringTransaction.updateMany({
         where: {
           id,
@@ -200,7 +202,9 @@ export class RecurringTransactionsService {
       });
 
       return { transaction, recurring: updatedRecurring };
-    });
+    },
+      interactiveTransactionOptions,
+    );
   }
 
   private validatePayload(

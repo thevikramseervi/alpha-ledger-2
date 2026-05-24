@@ -12,7 +12,7 @@ Currency and formatting default to **INR (`en-IN`)**.
 |-------|------------|
 | Frontend | Next.js 16, React 19, TypeScript, Tailwind CSS 4, shadcn/ui, Recharts |
 | Backend | NestJS 11, Prisma 7, class-validator, Swagger |
-| Database | PostgreSQL 16 (Docker) |
+| Database | PostgreSQL 16 ([Neon](https://neon.com) recommended, or Docker locally) |
 
 ## Navigation
 
@@ -114,10 +114,34 @@ There is no `/dashboard` route — the dashboard is the home page (`/`).
 ### Prerequisites
 
 - Node.js 20+
-- Docker (for PostgreSQL)
 - npm
+- A PostgreSQL database — **[Neon](https://neon.com)** (recommended) or Docker for local-only Postgres
 
-### 1. Start PostgreSQL
+### 1. Database
+
+#### Option A — Neon (recommended)
+
+No Docker required. Your data lives in Neon’s managed Postgres and works from any machine once `DATABASE_URL` is set.
+
+1. Sign up at [neon.com](https://neon.com) and create a project (PostgreSQL 16).
+2. In the Neon console, open **Connect** and copy the **direct** connection string (not the pooler URL — best for this NestJS app).
+3. Ensure the string includes SSL — for Neon use `?sslmode=verify-full` (or keep Neon’s default query params).
+4. Put it in `backend/.env`:
+
+```env
+DATABASE_URL="postgresql://USER:PASSWORD@ep-xxxx.region.aws.neon.tech/neondb?sslmode=verify-full"
+```
+
+5. Apply migrations:
+
+```bash
+cd backend
+npx prisma migrate deploy
+```
+
+Neon starts **empty**. Migrations create tables and the three default accounts (Cash, Kotak, HDFC). To move data from old local Docker Postgres, see [Migrating from Docker Postgres](#migrating-from-docker-postgres) below.
+
+#### Option B — Docker PostgreSQL (local only)
 
 From the repo root:
 
@@ -133,15 +157,19 @@ docker compose up -d
 
 | Setting | Value |
 |---------|-------|
-| Database | `alpha_ledger` (see note below if your `.env` differs) |
+| Database | `alpha_ledger` |
 | User | `alpha` |
 | Password | `alpha_secret` |
 | Port | `5432` |
 | Container | `alpha-ledger-db` |
 
-If you see a container name conflict, the database already exists — use `docker compose start`, not `docker compose up`.
+Set in `backend/.env`:
 
-> **Database name:** Docker Compose creates `alpha_ledger`. Your `backend/.env` `DATABASE_URL` must match an existing database (some setups use `alpha_ledger_app` instead).
+```env
+DATABASE_URL="postgresql://alpha:alpha_secret@localhost:5432/alpha_ledger?schema=public"
+```
+
+If you see a container name conflict, the database already exists — use `docker compose start`, not `docker compose up`.
 
 ### 2. Backend
 
@@ -177,11 +205,29 @@ npm run dev
 
 ### Recommended startup order
 
-1. `docker compose start` — database  
+**With Neon:** skip Docker.
+
+1. Set `DATABASE_URL` in `backend/.env` and run `npx prisma migrate deploy` once  
 2. `cd backend && npm run start:dev` — wait for “Nest application successfully started”  
 3. `cd frontend && npm run dev` — frontend  
 
+**With Docker Postgres:** `docker compose start` before step 2.
+
 Starting backend and frontend in separate terminals avoids a heavy simultaneous compile on first run.
+
+### Migrating from Docker Postgres
+
+If you already have data in local Docker and want it on Neon:
+
+```bash
+# Export from Docker (adjust db name if you used alpha_ledger_app)
+docker exec alpha-ledger-db pg_dump -U alpha -d alpha_ledger_app --no-owner --no-acl > alpha-ledger-backup.sql
+
+# Import to Neon (paste your Neon direct connection string)
+psql "postgresql://USER:PASSWORD@ep-xxxx.neon.tech/neondb?sslmode=require" < alpha-ledger-backup.sql
+```
+
+If starting fresh on Neon, skip this — `prisma migrate deploy` is enough.
 
 ### First-time use
 
@@ -200,7 +246,7 @@ Categories are not seeded — only the three default accounts exist on a fresh d
 
 | Variable | Description |
 |----------|-------------|
-| `DATABASE_URL` | PostgreSQL connection string |
+| `DATABASE_URL` | PostgreSQL connection string (Neon direct URL with `?sslmode=verify-full`, or local Docker URL) |
 | `PORT` | API port (default `3001`) |
 | `HOST` | Listen address — dev defaults to `0.0.0.0` for LAN; production uses `127.0.0.1` |
 | `FRONTEND_URL` | Primary CORS origin (default `http://localhost:3000`) |
@@ -393,7 +439,7 @@ npm run lint
 
 | Problem | Fix |
 |---------|-----|
-| API returns 500 | PostgreSQL not running — `docker compose start` |
+| API returns 500 | Check `DATABASE_URL`; for Neon ensure SSL (`sslmode=verify-full`). For Docker: `docker compose start` |
 | API returns 401 | Set `NEXT_PUBLIC_API_KEY` to match backend `API_KEY` |
 | `docker compose up` container conflict | Container already exists — use `docker compose start` |
 | Frontend can’t reach API | Backend running on 3001? Check `NEXT_PUBLIC_API_URL` |

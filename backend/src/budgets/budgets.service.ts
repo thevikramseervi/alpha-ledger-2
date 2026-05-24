@@ -8,6 +8,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { getCategoryAllocations } from '../common/category-allocations';
 import { getMonthDateRange } from '../common/date-utils';
 import { SyncBudgetsDto } from './dto/budget.dto';
+import { interactiveTransactionOptions } from '../common/interactive-transaction-options';
 
 @Injectable()
 export class BudgetsService {
@@ -104,7 +105,8 @@ export class BudgetsService {
       }
     }
 
-    await this.prisma.$transaction(async (tx) => {
+    await this.prisma.$transaction(
+      async (tx) => {
       for (const entry of dto.budgets) {
         if (entry.amount <= 0) {
           await tx.categoryBudget.deleteMany({
@@ -136,7 +138,9 @@ export class BudgetsService {
           },
         });
       }
-    });
+    },
+      interactiveTransactionOptions,
+    );
 
     return this.getOverview(dto.year, dto.month);
   }

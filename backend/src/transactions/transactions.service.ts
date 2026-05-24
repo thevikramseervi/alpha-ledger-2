@@ -21,6 +21,7 @@ import {
   getRentalIncomeAmount,
 } from '../common/category-allocations';
 import { TagsService } from '../tags/tags.service';
+import { interactiveTransactionOptions } from '../common/interactive-transaction-options';
 
 const transactionInclude = {
   account: true,
@@ -64,7 +65,10 @@ export class TransactionsService {
   async create(dto: CreateTransactionDto) {
     await this.validateForCreate(dto);
 
-    return this.prisma.$transaction(async (tx) => this.createInTransaction(tx, dto));
+    return this.prisma.$transaction(
+      async (tx) => this.createInTransaction(tx, dto),
+      interactiveTransactionOptions,
+    );
   }
 
   async validateForCreate(dto: CreateTransactionDto) {
@@ -333,14 +337,18 @@ export class TransactionsService {
     };
 
     if (!balanceChanged) {
-      return this.prisma.$transaction(async (tx) => {
+      return this.prisma.$transaction(
+        async (tx) => {
         await tx.$queryRaw`SELECT id FROM "Transaction" WHERE id = ${id} FOR UPDATE`;
         const updated = await applyUpdate(tx);
         return this.finalizeUpdateWithTags(tx, id, dto.tagIds, updated);
-      });
+      },
+        interactiveTransactionOptions,
+      );
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    return this.prisma.$transaction(
+      async (tx) => {
       await tx.$queryRaw`SELECT id FROM "Transaction" WHERE id = ${id} FOR UPDATE`;
       await this.lockAccountsForEffects(tx, [
         {
@@ -373,11 +381,14 @@ export class TransactionsService {
       });
 
       return this.finalizeUpdateWithTags(tx, id, dto.tagIds, transaction);
-    });
+    },
+      interactiveTransactionOptions,
+    );
   }
 
   async remove(id: string) {
-    return this.prisma.$transaction(async (tx) => {
+    return this.prisma.$transaction(
+      async (tx) => {
       await tx.$queryRaw`SELECT id FROM "Transaction" WHERE id = ${id} FOR UPDATE`;
 
       const existing = await tx.transaction.findUnique({
@@ -403,7 +414,9 @@ export class TransactionsService {
         toAccountId: existing.toAccountId,
       });
       await tx.transaction.delete({ where: { id } });
-    });
+    },
+      interactiveTransactionOptions,
+    );
 
     return { deleted: true };
   }

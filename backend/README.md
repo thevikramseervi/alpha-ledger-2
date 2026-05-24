@@ -7,22 +7,27 @@ NestJS REST API with Prisma and PostgreSQL.
 ```bash
 cp .env.example .env
 npm install
-npm run db:migrate
+npx prisma migrate deploy
 npm run start:dev
 ```
 
-Ensure Docker Postgres is running from the repo root before migrating:
+### Database: Neon (recommended)
 
-```bash
-docker compose start
-```
+1. Create a project at [neon.com](https://neon.com).
+2. Copy the **direct** connection string from **Connect** (use `?sslmode=verify-full` for Neon).
+3. Set `DATABASE_URL` in `.env`.
+4. Run `npx prisma migrate deploy`.
+
+Use the **direct** URL for this NestJS app (not the `-pooler` URL). A single long-lived backend process does not need Neon's connection pooler.
+
+For local-only development without Neon, use Docker Postgres from the repo root (`docker compose up -d`) and the local `DATABASE_URL` in `.env.example`.
+
+There is **no seed script**. Data is created through the app or API; fresh migrations insert three default accounts only.
 
 | URL | Purpose |
 |-----|---------|
 | http://localhost:3001/api | REST API |
 | http://localhost:3001/docs | Swagger UI |
-
-There is **no seed script**. Data is created through the app or API.
 
 ### Applying migrations
 
@@ -208,14 +213,16 @@ DELETE /api/tags/:id
 See `.env.example`:
 
 ```env
-DATABASE_URL="postgresql://alpha:alpha_secret@localhost:5432/alpha_ledger?schema=public"
+DATABASE_URL="postgresql://USER:PASSWORD@ep-xxxx.region.aws.neon.tech/neondb?sslmode=verify-full"
 PORT=3001
 FRONTEND_URL="http://localhost:3000"
 # HOST=0.0.0.0          # dev default; production uses 127.0.0.1
 # API_KEY=your-secret-key
 ```
 
-Your local `.env` may use a different database name (e.g. `alpha_ledger_app`) if you created one manually. It must match a database that exists in Postgres.
+For local Docker Postgres instead, see `.env.example`.
+
+Your local `.env` must never be committed.
 
 ## Source layout
 
