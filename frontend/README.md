@@ -42,7 +42,7 @@ On LAN, the API client automatically targets port `3001` on the same host as the
 | Route | Description |
 |-------|-------------|
 | `/` | Dashboard — KPI cards with MoM/YoY, net worth, cash flow (6M/12M/YTD), budgets, category donut, recent transactions, recurring nudge |
-| `/reports` | Reports — cash flow, categories, tags, net worth, budgets; preset or custom range; CSV + print export |
+| `/reports` | Reports — cash flow, categories, tags, net worth, budgets; preset or custom range; CSV + PDF export |
 | `/transactions` | Transaction list, filters (incl. tag), CSV export, due-only recurring banner |
 | `/recurring` | Recurring templates — create, edit, activate/deactivate, post for month |
 | `/accounts` | Monthly statements, balance charts, account CRUD |
@@ -80,14 +80,30 @@ Shared analytics helpers: `src/lib/dashboard-analytics.ts`.
 
 | Component | Purpose |
 |-----------|---------|
-| `reports-page-client.tsx` | Preset vs custom range, export CSV, print/PDF, tabbed layout |
+| `reports-page-client.tsx` | Preset vs custom range, export CSV, full/summary PDF, tabbed layout |
 | `reports-cash-flow-tab.tsx` | Period totals, cash flow chart, monthly net savings list |
 | `reports-categories-tab.tsx` | Top categories, trends, sub-category drill-down, stacked bars |
 | `reports-tags-tab.tsx` | Tag breakdown donut and list |
 | `reports-net-worth-tab.tsx` | Net worth trend + account allocation |
 | `reports-budgets-tab.tsx` | Budget hit rate and monthly budget vs spent |
 
-Export/print: `src/lib/export-reports-csv.ts`, `src/lib/print-reports.ts`, `src/lib/reports-format.ts`.
+Export: `src/lib/export-reports-csv.ts`, `src/lib/reports-pdf/` (full + summary PDF via `@react-pdf/renderer`), `src/lib/reports-format.ts`.
+
+#### PDF export (`src/lib/reports-pdf/`)
+
+| File | Purpose |
+|------|---------|
+| `download-reports-pdf.tsx` | Fetches export package, renders PDF blob, triggers download; supports `mode: 'full' \| 'summary'` and `onProgress` callback |
+| `reports-pdf-document.tsx` | Multi-page PDF document (cover, executive summary, accounts, categories, budgets, rental/investments, optional ledger) |
+| `pdf-charts.tsx` | SVG line, bar, and horizontal bar charts for net worth, cash flow, categories, allocation |
+| `pdf-components.tsx` | Reusable table, KPI cards, footer with page numbers, table of contents, brand mark |
+| `pdf-format.ts` | Period labels, currency formatting, category/trend helpers |
+| `pdf-styles.ts` | Inter-based styles, colors, zebra rows |
+| `pdf-fonts.ts` | Registers Inter from CDN for `@react-pdf/renderer` |
+
+**Full PDF** includes: period start→end balance snapshot, KPIs, SVG charts, account allocation, monthly account balances with flow detail, category trends and sub-categories, tags, budget period totals, full-period rental/investment, and the complete transaction ledger (color-coded amounts, notes, cleared/pending).
+
+**Summary PDF** omits the transaction ledger; filename gets a `-summary` suffix.
 
 ### Recurring (`components/recurring/`)
 
@@ -167,7 +183,7 @@ src/
 │   ├── dashboard-analytics.ts  # Chart range, MoM/YoY, month shifting
 │   ├── export-transactions-csv.ts  # Transaction CSV (tags column, formula guard)
 │   ├── export-reports-csv.ts       # Report summary CSV
-│   ├── print-reports.ts            # Print / PDF via browser print dialog
+│   ├── reports-pdf/                # Full + summary PDF export (@react-pdf/renderer)
 │   ├── reports-format.ts           # Report period labels
 │   ├── format.ts        # INR formatting, date helpers, labels
 │   ├── reconciliation.ts
@@ -183,6 +199,7 @@ Typed methods for all backend resources. Notable:
 - `api.transactions.list({ tagId, fromDate, toDate, ... })`
 - `api.transactions.create/update` — pass `tagIds?: string[]`
 - `api.reports.overview({ year, month, range })` or `{ fromDate, toDate }`
+- `api.reports.exportPackage(...)` — full data bundle for PDF export
 - `api.tags.list/create/update/delete`
 
 ## UI notes
@@ -195,7 +212,7 @@ Typed methods for all backend resources. Notable:
 - Destructive actions (delete account, category, tag, transaction) use confirmation dialogs
 - Charts via **Recharts** (area, line, bar, pie)
 - `suppressHydrationWarning` on `<html>` / `<body>` for browser extension attributes
-- Reports **Print / PDF** opens a new window and triggers the browser print dialog (save as PDF from there)
+- Reports **PDF export** — **Download full PDF** (includes transaction ledger) or **Summary PDF** (analytics only); built client-side with `@react-pdf/renderer`. Button shows progress while fetching data and rendering. Requires backend `GET /reports/export-package`.
 
 ## Troubleshooting
 
@@ -207,7 +224,7 @@ Typed methods for all backend resources. Notable:
 | API errors on load | Backend or Postgres not running; check API key if set |
 | Select shows ID after pick | `SelectValue` needs a label render function — see existing forms |
 | LAN / phone access | Use `http://<laptop-ip>:3000`; set `DEV_ALLOWED_ORIGINS` if HMR fails |
-| Print / PDF blocked | Allow pop-ups for localhost when using Reports print export |
+| PDF export slow or fails | Restart backend; large ranges (500+ transactions) take longer; check browser console |
 
 ## Agent / IDE rules
 

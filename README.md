@@ -10,7 +10,7 @@ Currency and formatting default to **INR (`en-IN`)**.
 
 | Layer | Technology |
 |-------|------------|
-| Frontend | Next.js 16, React 19, TypeScript, Tailwind CSS 4, shadcn/ui, Recharts |
+| Frontend | Next.js 16, React 19, TypeScript, Tailwind CSS 4, shadcn/ui, Recharts, `@react-pdf/renderer` (reports PDF) |
 | Backend | NestJS 11, Prisma 7, class-validator, Swagger |
 | Database | PostgreSQL 16 ([Neon](https://neon.com) recommended, or Docker locally) |
 
@@ -47,12 +47,16 @@ There is no `/dashboard` route — the dashboard is the home page (`/`).
 ### Reports (`/reports`)
 
 - Tabbed insights page with **Preset** (6M / 12M / YTD + month) or **Custom range** (from/to dates, max 24 months)
-- **Export CSV** and **Print / PDF** for the loaded report summary
+- **Export CSV** — summary tables (cash flow, categories, tags, net worth, budgets) for the loaded period
+- **Download full PDF** — multi-page report with analytics, charts, account balances, rental/investment summaries, and the full transaction ledger
+- **Summary PDF** — same analytics and charts without the transaction ledger (faster for sharing)
 - **Cash flow** — period totals, trend chart, monthly net savings list
 - **Categories** — top categories, trend lines, stacked monthly bars, sub-category drill-down
 - **Tags** — tagged transaction breakdown with donut chart
 - **Net worth** — trend chart plus account allocation donut at period end
 - **Budgets** — monthly hit rate (% categories on track), budget vs spent summary
+
+PDF export is built **client-side** with `@react-pdf/renderer`. The frontend fetches a full data bundle from `GET /reports/export-package` (same date params as overview), then renders and downloads the file. Large ranges (500+ transactions) may take a few seconds; the button shows progress while fetching and rendering.
 
 ### Transactions (`/transactions`)
 
@@ -334,8 +338,12 @@ All routes are prefixed with `/api`. When `API_KEY` is set, include header `x-ap
 |--------|----------|-------------|
 | GET | `/reports/overview?year=&month=&range=6m\|12m\|ytd` | Cash flow, categories, tags, net worth, and budget history ending at the selected month |
 | GET | `/reports/overview?fromDate=&toDate=` | Same overview for a custom date range (max 24 months) |
+| GET | `/reports/export-package?year=&month=&range=6m\|12m\|ytd` | Full data bundle for PDF export (same query params as overview) |
+| GET | `/reports/export-package?fromDate=&toDate=` | Export bundle for a custom date range |
 
-Response includes `periodMode` (`preset` \| `custom`), `fromDate`, `toDate`, and `tags[]` breakdown when applicable.
+Overview response includes `periodMode` (`preset` \| `custom`), `fromDate`, `toDate`, and `tags[]` breakdown when applicable.
+
+**Export package** adds: all transactions in the period (with accounts, categories, splits, tags), monthly account balance summaries, end-month budget overview, rental/investment snapshots for the latest month, and **period-scoped** rental/investment totals (`rentalIncomePeriod`, `investmentSummaryPeriod`) aggregated across the full selected range.
 
 ### Tags
 
@@ -407,7 +415,7 @@ alpha-ledger-2/
 │       │   ├── tags/
 │       │   ├── accounts/
 │       │   └── shared/
-│       └── lib/                   # API client, charts, CSV/print export, INR formatting
+│       └── lib/                   # API client, charts, CSV/PDF export (reports-pdf/), INR formatting
 ├── docker-compose.yml
 └── .cursorignore                  # Excludes node_modules, .next, dist from indexing
 ```
@@ -449,6 +457,7 @@ npm run lint
 | HMR WebSocket fails on LAN | Add your IP to `DEV_ALLOWED_ORIGINS` in frontend `.env.local` |
 | `migrate dev` wants to reset DB | Use `npx prisma migrate deploy` to apply pending migrations only |
 | Reports custom range error | `fromDate` must be ≤ `toDate`; range capped at 24 months |
+| PDF export slow or fails | Restart backend after updates; large ranges (500+ txns) take longer; check browser console for render errors |
 | No categories on fresh DB | Expected — create categories in the app (only accounts are pre-inserted) |
 
 ## Scope (what this app is not)

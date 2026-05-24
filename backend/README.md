@@ -146,6 +146,22 @@ Logic lives in `src/common/account-balance-summary.ts`. Statement visibility use
 
 Tag totals split each non-transfer transaction amount evenly across its tags.
 
+**Export package** (`getExportPackage`) — same date params as overview. Returns everything needed for PDF export:
+
+| Field | Contents |
+|-------|----------|
+| `generatedAt` | ISO timestamp |
+| `overview` | Same shape as `GET /reports/overview` |
+| `transactions` | All transactions in the period (account, toAccount, category, splits, tags) |
+| `accountSummaries` | Monthly balance summary per month in the range |
+| `budgetOverview` | Budget vs actual for the **last month** in the range |
+| `rentalIncome` | Latest-month + YTD rental income snapshot |
+| `rentalIncomePeriod` | Rental income aggregated over the **full selected range** |
+| `investmentSummary` | Latest-month + YTD investment snapshot |
+| `investmentSummaryPeriod` | Investments aggregated over the **full selected range** |
+
+Period-scoped rental/investment summaries use `TransactionsService.getRentalIncomeSummaryForRange()` and `getInvestmentSummaryForRange()`.
+
 ### Category allocations
 
 Split transactions use `src/common/category-allocations.ts` for:
@@ -196,6 +212,8 @@ GET  /api/budgets/overview?year=2026&month=5
 PUT  /api/budgets/sync                # { year, month, budgets[] }
 GET  /api/reports/overview?year=2026&month=5&range=12m
 GET  /api/reports/overview?fromDate=2026-01-01&toDate=2026-05-31
+GET  /api/reports/export-package?year=2026&month=5&range=12m
+GET  /api/reports/export-package?fromDate=2026-01-01&toDate=2026-05-31
 GET  /api/tags
 POST /api/tags                        # { name, color? }
 PATCH /api/tags/:id

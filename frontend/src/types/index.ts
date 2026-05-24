@@ -245,6 +245,32 @@ export interface ReportsOverview {
   budgets: ReportsBudgetMonth[];
 }
 
+export interface RentalIncomePeriodSummary {
+  configured: boolean;
+  categoryName: string;
+  periodTotal: number;
+  periodTransactionCount: number;
+  byHouse: RentalIncomeHouseSummary[];
+}
+
+export interface InvestmentPeriodSummary {
+  periodTotal: number;
+  periodTransactionCount: number;
+  byCategory: InvestmentCategorySummary[];
+}
+
+export interface ReportsExportPackage {
+  generatedAt: string;
+  overview: ReportsOverview;
+  transactions: Transaction[];
+  accountSummaries: AccountBalanceSummary[];
+  rentalIncome: RentalIncomeSummary;
+  rentalIncomePeriod: RentalIncomePeriodSummary;
+  investmentSummary: InvestmentSummary;
+  investmentSummaryPeriod: InvestmentPeriodSummary;
+  budgetOverview: BudgetOverview;
+}
+
 export interface CreateTransactionInput {
   amount: number;
   type: TransactionType;

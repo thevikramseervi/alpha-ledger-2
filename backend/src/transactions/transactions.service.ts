@@ -661,6 +661,70 @@ export class TransactionsService {
     };
   }
 
+  async getRentalIncomeSummaryForRange(from: Date, to: Date) {
+    const category = await this.prisma.category.findFirst({
+      where: {
+        type: TransactionType.INCOME,
+        name: { equals: 'Rental Income', mode: 'insensitive' },
+      },
+      include: {
+        subCategories: {
+          orderBy: { name: 'asc' },
+        },
+      },
+    });
+
+    if (!category) {
+      return {
+        configured: false,
+        categoryName: 'Rental Income',
+        periodTotal: 0,
+        periodTransactionCount: 0,
+        byHouse: [] as Array<{
+          subCategoryId: string | null;
+          subCategoryName: string;
+          total: number;
+          count: number;
+        }>,
+      };
+    }
+
+    const periodTransactions = await this.prisma.transaction.findMany({
+      where: {
+        type: TransactionType.INCOME,
+        date: { gte: from, lte: to },
+        OR: [
+          { categoryId: category.id },
+          { splits: { some: { categoryId: category.id } } },
+        ],
+      },
+      include: {
+        category: true,
+        subCategory: true,
+        splits: { include: { category: true, subCategory: true } },
+      },
+    });
+
+    const byHouse = this.aggregateRentalIncomeByHouse(
+      periodTransactions,
+      category.subCategories,
+      category.id,
+    );
+
+    return {
+      configured: true,
+      categoryName: category.name,
+      periodTotal: periodTransactions.reduce(
+        (sum, tx) => sum + getRentalIncomeAmount(tx, category.id),
+        0,
+      ),
+      periodTransactionCount: periodTransactions.filter(
+        (tx) => getRentalIncomeAmount(tx, category.id) > 0,
+      ).length,
+      byHouse,
+    };
+  }
+
   async getInvestmentSummary(
     year: number,
     month: number,
@@ -734,6 +798,51 @@ export class TransactionsService {
       ),
       yearToDateByCategory: this.aggregateInvestmentsByCategory(
         yearToDateTransactions,
+        investmentCategories,
+      ),
+    };
+  }
+
+  async getInvestmentSummaryForRange(from: Date, to: Date, accountId?: string) {
+    if (accountId) {
+      await this.ensureAccountExists(accountId);
+    }
+
+    const investmentCategories = await this.prisma.category.findMany({
+      where: { type: TransactionType.INVESTMENT },
+      include: {
+        subCategories: {
+          orderBy: { name: 'asc' },
+        },
+      },
+      orderBy: { name: 'asc' },
+    });
+
+    const baseWhere: Prisma.TransactionWhereInput = {
+      type: TransactionType.INVESTMENT,
+      date: { gte: from, lte: to },
+      ...(accountId ? { accountId } : {}),
+    };
+
+    const periodTransactions = await this.prisma.transaction.findMany({
+      where: baseWhere,
+      include: {
+        category: true,
+        subCategory: true,
+        account: true,
+        splits: { include: { category: true, subCategory: true } },
+      },
+      orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
+    });
+
+    return {
+      periodTotal: periodTransactions.reduce(
+        (sum, tx) => sum + Number(tx.amount),
+        0,
+      ),
+      periodTransactionCount: periodTransactions.length,
+      byCategory: this.aggregateInvestmentsByCategory(
+        periodTransactions,
         investmentCategories,
       ),
     };

@@ -1,5 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { TransactionType } from '../generated/prisma/client';
+import { AccountsService } from '../accounts/accounts.service';
+import { BudgetsService } from '../budgets/budgets.service';
 import { getAccountBalanceAtMonthBoundaries } from '../common/account-balance-summary';
 import { getCategoryAllocations } from '../common/category-allocations';
 import {
@@ -12,8 +14,11 @@ import {
   ReportsRange,
 } from '../common/date-utils';
 import { PrismaService } from '../prisma/prisma.service';
+import { TransactionsService } from '../transactions/transactions.service';
 
 const transactionInclude = {
+  account: true,
+  toAccount: true,
   category: true,
   subCategory: true,
   tags: {
@@ -31,7 +36,12 @@ const transactionInclude = {
 
 @Injectable()
 export class ReportsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly accountsService: AccountsService,
+    private readonly budgetsService: BudgetsService,
+    private readonly transactionsService: TransactionsService,
+  ) {}
 
   async getOverview(params: {
     year?: number;
@@ -422,6 +432,57 @@ export class ReportsService {
       },
       tags: Array.from(tagTotals.values()).sort((a, b) => b.total - a.total),
       budgets: budgetHistory,
+    };
+  }
+
+  async getExportPackage(params: {
+    year?: number;
+    month?: number;
+    range?: ReportsRange;
+    fromDate?: string;
+    toDate?: string;
+  }) {
+    const overview = await this.getOverview(params);
+    const { start, end } = getOverallDateRange(overview.months);
+    const endMonth = overview.months[overview.months.length - 1]!;
+
+    const [transactions, accountSummaries, rentalIncome, rentalIncomePeriod, investmentSummary, investmentSummaryPeriod, budgetOverview] =
+      await Promise.all([
+        this.prisma.transaction.findMany({
+          where: {
+            date: { gte: start, lte: end },
+          },
+          include: transactionInclude,
+          orderBy: [{ date: 'asc' }, { createdAt: 'asc' }],
+        }),
+        Promise.all(
+          overview.months.map((entry) =>
+            this.accountsService.getBalanceSummary(entry.year, entry.month),
+          ),
+        ),
+        this.transactionsService.getRentalIncomeSummary(
+          endMonth.year,
+          endMonth.month,
+        ),
+        this.transactionsService.getRentalIncomeSummaryForRange(start, end),
+        this.transactionsService.getInvestmentSummary(
+          endMonth.year,
+          endMonth.month,
+        ),
+        this.transactionsService.getInvestmentSummaryForRange(start, end),
+        this.budgetsService.getOverview(endMonth.year, endMonth.month),
+      ]);
+
+    return {
+      generatedAt: new Date().toISOString(),
+      overview,
+      transactions,
+      accountSummaries,
+      rentalIncome,
+      rentalIncomePeriod,
+      investmentSummary,
+      investmentSummaryPeriod,
+      budgetOverview,
     };
   }
 }

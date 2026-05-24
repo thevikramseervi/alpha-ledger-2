@@ -23,6 +23,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - `src/lib/api.ts` — typed methods; respects `NEXT_PUBLIC_API_KEY`
 - LAN: auto-targets port `3001` on same host as browser (unless `localhost`)
 - Reports: `api.reports.overview({ year, month, range })` or `{ fromDate, toDate }`
+- Reports PDF: `api.reports.exportPackage(...)` — same params as overview; returns `ReportsExportPackage`
 - Tags: `api.tags.*`; transactions accept `tagIds` on create/update, filter by `tagId`
 
 ## UI conventions
@@ -58,8 +59,12 @@ This version has breaking changes — APIs, conventions, and file structure may 
 ## Export
 
 - Transactions CSV: `export-transactions-csv.ts` (includes Tags column, formula-injection guard)
-- Reports CSV: `export-reports-csv.ts`
-- Reports print: `print-reports.ts` (new window + `window.print()`)
+- Reports CSV: `export-reports-csv.ts` (overview summary tables only)
+- Reports PDF: `src/lib/reports-pdf/` (`@react-pdf/renderer`)
+  - Entry: `downloadReportsPdfFromParams(params, { mode: 'full' | 'summary', onProgress })`
+  - Document: `ReportsPdfDocument` in `reports-pdf-document.tsx`
+  - Fonts: Inter registered in `pdf-fonts.ts` (CDN); call `registerPdfFonts()` before render
+  - Backend must expose `rentalIncomePeriod` and `investmentSummaryPeriod` on export package
 
 ## Dev server
 

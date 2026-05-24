@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Download, Printer } from "lucide-react";
+import { Download, FileDown } from "lucide-react";
 import { toast } from "sonner";
 import { ChartRangeToggle } from "@/components/dashboard/chart-range-toggle";
 import { ReportsBudgetsTab } from "@/components/reports/reports-budgets-tab";
@@ -19,7 +19,7 @@ import { getApiErrorMessage, logApiError, toastApiError } from "@/lib/api-error"
 import { DashboardChartRange } from "@/lib/dashboard-analytics";
 import { exportReportsToCsv } from "@/lib/export-reports-csv";
 import { getCurrentPeriod } from "@/lib/format";
-import { printReportsOverview } from "@/lib/print-reports";
+import { downloadReportsPdfFromParams } from "@/lib/reports-pdf/download-reports-pdf";
 import { getReportsPeriodLabel } from "@/lib/reports-format";
 import { ReportsOverview } from "@/types";
 
@@ -44,6 +44,8 @@ export function ReportsPageClient() {
   const [overview, setOverview] = useState<ReportsOverview | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [pdfDownloading, setPdfDownloading] = useState(false);
+  const [pdfProgress, setPdfProgress] = useState<string | null>(null);
 
   const usingCustomRange = periodMode === "custom";
 
@@ -103,13 +105,31 @@ export function ReportsPageClient() {
     toast.success("Report exported as CSV");
   };
 
-  const handlePrint = () => {
-    if (!overview) return;
-
+  const handleDownloadPdf = async (mode: "full" | "summary") => {
+    setPdfDownloading(true);
+    setPdfProgress(null);
     try {
-      printReportsOverview(overview);
+      await downloadReportsPdfFromParams(
+        usingCustomRange
+          ? {
+              fromDate,
+              toDate: toDate || fromDate,
+            }
+          : { year, month, range },
+        {
+          mode,
+          onProgress: setPdfProgress,
+        },
+      );
+      toast.success(
+        mode === "summary" ? "Summary PDF downloaded" : "Full report PDF downloaded",
+      );
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to open print view");
+      toastApiError("Failed to generate PDF report", error);
+      logApiError("Reports PDF export failed", error);
+    } finally {
+      setPdfDownloading(false);
+      setPdfProgress(null);
     }
   };
 
@@ -170,6 +190,27 @@ export function ReportsPageClient() {
           <div className="flex flex-wrap gap-2">
             <Button
               type="button"
+              size="sm"
+              onClick={() => void handleDownloadPdf("full")}
+              disabled={loading || pdfDownloading}
+            >
+              <FileDown className="mr-2 h-4 w-4" />
+              {pdfDownloading
+                ? pdfProgress ?? "Building PDF…"
+                : "Download full PDF"}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => void handleDownloadPdf("summary")}
+              disabled={loading || pdfDownloading}
+            >
+              <FileDown className="mr-2 h-4 w-4" />
+              {pdfDownloading && pdfProgress ? pdfProgress : "Summary PDF"}
+            </Button>
+            <Button
+              type="button"
               variant="outline"
               size="sm"
               onClick={handleExportCsv}
@@ -177,16 +218,6 @@ export function ReportsPageClient() {
             >
               <Download className="mr-2 h-4 w-4" />
               Export CSV
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={handlePrint}
-              disabled={loading || !overview}
-            >
-              <Printer className="mr-2 h-4 w-4" />
-              Print / PDF
             </Button>
           </div>
         </div>

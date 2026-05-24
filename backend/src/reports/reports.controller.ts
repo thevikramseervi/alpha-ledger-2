@@ -10,4 +10,9 @@ export class ReportsController {
   getOverview(@Query() query: ReportsQueryDto) {
     return this.reportsService.getOverview(query);
   }
+
+  @Get('export-package')
+  getExportPackage(@Query() query: ReportsQueryDto) {
+    return this.reportsService.getExportPackage(query);
+  }
 }

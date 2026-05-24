@@ -279,6 +279,25 @@ export const api = {
         `/reports/overview?${search.toString()}`,
       );
     },
+    exportPackage: (params: {
+      year?: number;
+      month?: number;
+      range?: import('@/types').ReportsRange;
+      fromDate?: string;
+      toDate?: string;
+    }) => {
+      const search = new URLSearchParams();
+      if (params.year !== undefined) search.set('year', String(params.year));
+      if (params.month !== undefined) search.set('month', String(params.month));
+      if (params.range && params.range !== 'custom') {
+        search.set('range', params.range);
+      }
+      if (params.fromDate) search.set('fromDate', params.fromDate);
+      if (params.toDate) search.set('toDate', params.toDate);
+      return request<import('@/types').ReportsExportPackage>(
+        `/reports/export-package?${search.toString()}`,
+      );
+    },
   },
   tags: {
     list: () => request<import('@/types').Tag[]>('/tags'),
