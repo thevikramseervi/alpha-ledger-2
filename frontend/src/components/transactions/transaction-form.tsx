@@ -13,10 +13,17 @@ import {
 } from "@/components/ui/select";
 import { DateInput, DateInputHandle } from "@/components/shared/date-input";
 import { TransactionAmountInput, TransactionAmountInputHandle } from "./transaction-amount-input";
+import {
+  createDefaultSplits,
+  splitsAreValid,
+  TransactionSplitEditor,
+  TransactionSplitFormValues,
+} from "./transaction-split-editor";
 import { TransactionTypeSelector } from "./transaction-type-selector";
-import { Account, Category, Transaction, TransactionType } from "@/types";
+import { TransactionTagPicker } from "./transaction-tag-picker";
+import { Account, Category, Tag, Transaction, TransactionType } from "@/types";
 import { splitIsoDate, toIsoDate } from "@/lib/format";
-import { isValidTransactionAmount, trimOptional, trimRequired } from "@/lib/validation";
+import { isValidTransactionAmount, MAX_DESCRIPTION_LENGTH, MAX_NOTES_LENGTH, trimOptional, trimRequired } from "@/lib/validation";
 
 export interface TransactionFormValues {
   amount: string;
@@ -28,11 +35,15 @@ export interface TransactionFormValues {
   description: string;
   date: string;
   notes: string;
+  splitEnabled: boolean;
+  splits: TransactionSplitFormValues[];
+  tagIds: string[];
 }
 
 interface TransactionFormProps {
   categories: Category[];
   accounts: Account[];
+  tags?: Tag[];
   initialData?: Transaction;
   formKey?: string | number;
   onSubmit: (values: TransactionFormValues) => Promise<void>;
@@ -50,9 +61,14 @@ const defaultValues = (): TransactionFormValues => ({
   description: "",
   date: "",
   notes: "",
+  splitEnabled: false,
+  splits: createDefaultSplits(),
+  tagIds: [],
 });
 
 function mapInitialData(transaction: Transaction): TransactionFormValues {
+  const hasSplits = Boolean(transaction.splits && transaction.splits.length >= 2);
+
   return {
     amount: String(Number(transaction.amount)),
     type: transaction.type,
@@ -66,12 +82,22 @@ function mapInitialData(transaction: Transaction): TransactionFormValues {
       return toIsoDate(year, month, day);
     })(),
     notes: transaction.notes ?? "",
+    splitEnabled: hasSplits,
+    splits: hasSplits
+      ? transaction.splits!.map((split) => ({
+          categoryId: split.categoryId,
+          subCategoryId: split.subCategoryId ?? "",
+          amount: String(Number(split.amount)),
+        }))
+      : createDefaultSplits(),
+    tagIds: transaction.tags?.map((link) => link.tagId) ?? [],
   };
 }
 
 export function TransactionForm({
   categories,
   accounts,
+  tags = [],
   initialData,
   formKey,
   onSubmit,
@@ -106,6 +132,35 @@ export function TransactionForm({
     [accounts, values.accountId],
   );
 
+  const accountNameById = useMemo(
+    () => new Map(accounts.map((account) => [account.id, account.name])),
+    [accounts],
+  );
+
+  const categoryNameById = useMemo(
+    () => new Map(filteredCategories.map((category) => [category.id, category.name])),
+    [filteredCategories],
+  );
+
+  const subCategoryNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const category of categories) {
+      for (const subCategory of category.subCategories ?? []) {
+        map.set(subCategory.id, subCategory.name);
+      }
+    }
+    return map;
+  }, [categories]);
+
+  const renderAccountLabel = (value: string | null) =>
+    value ? accountNameById.get(value) ?? null : null;
+
+  const renderCategoryLabel = (value: string | null) =>
+    value ? categoryNameById.get(value) ?? null : null;
+
+  const renderSubCategoryLabel = (value: string | null) =>
+    value ? subCategoryNameById.get(value) ?? null : null;
+
   const hasValidCategory =
     values.type === "TRANSFER" ||
     filteredCategories.some((category) => category.id === values.categoryId);
@@ -119,7 +174,10 @@ export function TransactionForm({
         ? values.accountId &&
           values.toAccountId &&
           values.accountId !== values.toAccountId
-        : values.accountId && values.categoryId && hasValidCategory),
+        : values.accountId &&
+          (values.splitEnabled
+            ? splitsAreValid(values.splits, values.amount)
+            : values.categoryId && hasValidCategory)),
   );
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -158,6 +216,7 @@ export function TransactionForm({
                   categoryId: "",
                   subCategoryId: "",
                   toAccountId: type === "TRANSFER" ? current.toAccountId : "",
+                  splitEnabled: type === "TRANSFER" ? false : current.splitEnabled,
                 }));
                 requestAnimationFrame(() => amountInputRef.current?.focus());
               }}
@@ -199,10 +258,7 @@ export function TransactionForm({
                 >
                   <SelectTrigger id="fromAccount" className="w-full">
                     <SelectValue placeholder="Select source account">
-                      {(value) =>
-                        accounts.find((account) => account.id === value)?.name ??
-                        null
-                      }
+                      {renderAccountLabel}
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
@@ -227,10 +283,7 @@ export function TransactionForm({
                 >
                   <SelectTrigger id="toAccount" className="w-full">
                     <SelectValue placeholder="Select destination account">
-                      {(value) =>
-                        destinationAccounts.find((account) => account.id === value)
-                          ?.name ?? null
-                      }
+                      {renderAccountLabel}
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
@@ -245,82 +298,6 @@ export function TransactionForm({
             </div>
           ) : (
             <>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="category">Category</Label>
-                  <Select
-                    value={values.categoryId || null}
-                    onValueChange={(value) => {
-                      if (!value) return;
-                      setValues((current) => ({
-                        ...current,
-                        categoryId: value,
-                        subCategoryId: "",
-                      }));
-                    }}
-                    disabled={!values.type}
-                  >
-                    <SelectTrigger id="category" className="w-full">
-                      <SelectValue placeholder="Select category">
-                        {(value) =>
-                          filteredCategories.find((category) => category.id === value)
-                            ?.name ?? null
-                        }
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      {filteredCategories.map((category) => (
-                        <SelectItem key={category.id} value={category.id}>
-                          {category.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="subCategory">Sub-category</Label>
-                  <Select
-                    value={values.subCategoryId || null}
-                    onValueChange={(value) => {
-                      setValues((current) => ({
-                        ...current,
-                        subCategoryId: value ?? "",
-                      }));
-                    }}
-                    disabled={!values.categoryId || !hasSubCategories}
-                  >
-                    <SelectTrigger id="subCategory" className="w-full">
-                      <SelectValue
-                        placeholder={
-                          !values.categoryId
-                            ? "Select a category first"
-                            : hasSubCategories
-                              ? "Select sub-category"
-                              : "No sub-categories available"
-                        }
-                      >
-                        {(value) => {
-                          if (!value) return null;
-                          return (
-                            availableSubCategories.find(
-                              (subCategory) => subCategory.id === value,
-                            )?.name ?? null
-                          );
-                        }}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableSubCategories.map((subCategory) => (
-                        <SelectItem key={subCategory.id} value={subCategory.id}>
-                          {subCategory.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
               <div className="space-y-2">
                 <Label htmlFor="account">Account</Label>
                 <Select
@@ -333,10 +310,7 @@ export function TransactionForm({
                 >
                   <SelectTrigger id="account" className="w-full">
                     <SelectValue placeholder="Select account">
-                      {(value) =>
-                        accounts.find((account) => account.id === value)?.name ??
-                        null
-                      }
+                      {renderAccountLabel}
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
@@ -348,6 +322,107 @@ export function TransactionForm({
                   </SelectContent>
                 </Select>
               </div>
+
+              <div className="flex items-center gap-2">
+                <input
+                  id="splitEnabled"
+                  type="checkbox"
+                  checked={values.splitEnabled}
+                  onChange={(event) =>
+                    setValues((current) => ({
+                      ...current,
+                      splitEnabled: event.target.checked,
+                      splits:
+                        event.target.checked && current.splits.length < 2
+                          ? createDefaultSplits()
+                          : current.splits,
+                    }))
+                  }
+                  disabled={!values.type}
+                  className="h-4 w-4 rounded border-border"
+                />
+                <Label htmlFor="splitEnabled">Split across categories</Label>
+              </div>
+
+              {values.splitEnabled ? (
+                values.type ? (
+                  <TransactionSplitEditor
+                    type={values.type}
+                    categories={categories}
+                    totalAmount={values.amount}
+                    splits={values.splits}
+                    onChange={(splits) =>
+                      setValues((current) => ({ ...current, splits }))
+                    }
+                  />
+                ) : null
+              ) : (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="category">Category</Label>
+                    <Select
+                      value={values.categoryId || null}
+                      onValueChange={(value) => {
+                        if (!value) return;
+                        setValues((current) => ({
+                          ...current,
+                          categoryId: value,
+                          subCategoryId: "",
+                        }));
+                      }}
+                      disabled={!values.type}
+                    >
+                      <SelectTrigger id="category" className="w-full">
+                        <SelectValue placeholder="Select category">
+                          {renderCategoryLabel}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {filteredCategories.map((category) => (
+                          <SelectItem key={category.id} value={category.id}>
+                            {category.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="subCategory">Sub-category</Label>
+                    <Select
+                      value={values.subCategoryId || null}
+                      onValueChange={(value) => {
+                        setValues((current) => ({
+                          ...current,
+                          subCategoryId: value ?? "",
+                        }));
+                      }}
+                      disabled={!values.categoryId || !hasSubCategories}
+                    >
+                      <SelectTrigger id="subCategory" className="w-full">
+                        <SelectValue
+                          placeholder={
+                            !values.categoryId
+                              ? "Select a category first"
+                              : hasSubCategories
+                                ? "Select sub-category"
+                                : "No sub-categories available"
+                          }
+                        >
+                          {renderSubCategoryLabel}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableSubCategories.map((subCategory) => (
+                          <SelectItem key={subCategory.id} value={subCategory.id}>
+                            {subCategory.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              )}
             </>
           )}
 
@@ -358,9 +433,12 @@ export function TransactionForm({
               placeholder={
                 isTransfer
                   ? "e.g. Move funds to Kotak"
-                  : "What was this transaction for?"
+                  : values.splitEnabled
+                    ? "e.g. Big Bazaar shopping"
+                    : "What was this transaction for?"
               }
               value={values.description}
+              maxLength={MAX_DESCRIPTION_LENGTH}
               onChange={(event) =>
                 setValues((current) => ({
                   ...current,
@@ -372,11 +450,26 @@ export function TransactionForm({
           </div>
 
           <div className="space-y-2">
+            <Label>Tags (optional)</Label>
+            <TransactionTagPicker
+              tags={tags}
+              selectedIds={values.tagIds}
+              onChange={(tagIds) =>
+                setValues((current) => ({
+                  ...current,
+                  tagIds,
+                }))
+              }
+            />
+          </div>
+
+          <div className="space-y-2">
             <Label htmlFor="notes">Notes (optional)</Label>
             <Input
               id="notes"
               placeholder="Additional details"
               value={values.notes}
+              maxLength={MAX_NOTES_LENGTH}
               onChange={(event) =>
                 setValues((current) => ({ ...current, notes: event.target.value }))
               }

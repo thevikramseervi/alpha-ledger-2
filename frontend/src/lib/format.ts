@@ -45,6 +45,8 @@ export const DEFAULT_CATEGORY_COLOR: Record<
   INVESTMENT: '#6366f1',
 };
 
+export const DEFAULT_TAG_COLOR = '#6366f1';
+
 export const MONTH_NAMES = [
   'January',
   'February',

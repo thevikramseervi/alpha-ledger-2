@@ -6,9 +6,12 @@ import {
   Param,
   Patch,
   Post,
+  Query,
 } from '@nestjs/common';
 import { AccountsService } from './accounts.service';
 import { CreateAccountDto, UpdateAccountDto } from './dto/account.dto';
+import { YearQueryDto } from './dto/year-query.dto';
+import { AccountBalanceQueryDto } from './dto/account-balance-query.dto';
 
 @Controller('accounts')
 export class AccountsController {
@@ -22,6 +25,21 @@ export class AccountsController {
   @Get()
   findAll() {
     return this.accountsService.findAll();
+  }
+
+  @Get('balance-summary')
+  getBalanceSummary(@Query() query: AccountBalanceQueryDto) {
+    return this.accountsService.getBalanceSummary(query.year, query.month);
+  }
+
+  @Get('balance-trend')
+  getBalanceTrend(@Query() query: YearQueryDto) {
+    return this.accountsService.getBalanceTrend(query.year);
+  }
+
+  @Get(':id/reconciliation')
+  getReconciliation(@Param('id') id: string) {
+    return this.accountsService.getReconciliation(id);
   }
 
   @Get(':id')

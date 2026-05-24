@@ -21,8 +21,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${inter.variable} dark h-full antialiased`}>
-      <body className="min-h-full bg-background font-sans text-foreground">
+    <html
+      lang="en"
+      className={`${inter.variable} dark h-full antialiased`}
+      suppressHydrationWarning
+    >
+      <body
+        className="min-h-full bg-background font-sans text-foreground"
+        suppressHydrationWarning
+      >
         <AppShell>{children}</AppShell>
         <Toaster richColors position="top-right" />
       </body>

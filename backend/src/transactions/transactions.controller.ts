@@ -16,6 +16,7 @@ import {
   TransactionQueryDto,
   UpdateTransactionDto,
 } from './dto/transaction.dto';
+import { MonthQueryDto, YearQueryDto } from './dto/month-query.dto';
 
 @Controller('transactions')
 export class TransactionsController {
@@ -32,19 +33,16 @@ export class TransactionsController {
   }
 
   @Get('summary/monthly')
-  getMonthlySummary(
-    @Query('year') year: string,
-    @Query('month') month: string,
-  ) {
+  getMonthlySummary(@Query() query: MonthQueryDto) {
     return this.transactionsService.getMonthlySummary(
-      Number(year),
-      Number(month),
+      query.year,
+      query.month,
     );
   }
 
   @Get('summary/yearly')
-  getYearlyTrend(@Query('year') year: string) {
-    return this.transactionsService.getYearlyTrend(Number(year));
+  getYearlyTrend(@Query() query: YearQueryDto) {
+    return this.transactionsService.getYearlyTrend(query.year);
   }
 
   @Get('summary/rental-income')

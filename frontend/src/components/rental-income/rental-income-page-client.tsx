@@ -10,7 +10,7 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
-import { getApiErrorMessage, toastApiError } from "@/lib/api-error";
+import { getApiErrorMessage, logApiError, toastApiError } from "@/lib/api-error";
 import {
   formatCurrency,
   formatDate,
@@ -63,7 +63,7 @@ export function RentalIncomePageClient() {
       }
       setLoadError(getApiErrorMessage(error));
       toastApiError("Failed to load rental income data", error);
-      console.error(error);
+      logApiError("API request failed", error);
     } finally {
       if (requestId === requestIdRef.current) {
         setLoading(false);

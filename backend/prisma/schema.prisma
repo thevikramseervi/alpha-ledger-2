@@ -22,15 +22,19 @@ enum AccountType {
 }
 
 model Account {
-  id                  String        @id @default(cuid())
-  name                String        @unique
-  type                AccountType   @default(BANK)
-  balance             Decimal       @default(0) @db.Decimal(12, 2)
-  color               String        @default("#6366f1")
-  transactions        Transaction[] @relation("TransactionAccount")
-  incomingTransfers   Transaction[] @relation("TransferTo")
-  createdAt           DateTime      @default(now())
-  updatedAt           DateTime      @updatedAt
+  id                        String                 @id @default(cuid())
+  name                      String                 @unique
+  type                      AccountType            @default(BANK)
+  balance                   Decimal                @default(0) @db.Decimal(12, 2)
+  initialBalance            Decimal                @default(0) @db.Decimal(12, 2)
+  trackingStartDate           DateTime               @default(now()) @db.Date
+  color                     String                 @default("#6366f1")
+  transactions              Transaction[]          @relation("TransactionAccount")
+  incomingTransfers         Transaction[]          @relation("TransferTo")
+  recurringTransactions     RecurringTransaction[] @relation("RecurringAccount")
+  recurringTransferTargets  RecurringTransaction[] @relation("RecurringTransferTo")
+  createdAt                 DateTime               @default(now())
+  updatedAt                 DateTime               @updatedAt
 }
 
 model Category {
@@ -39,9 +43,12 @@ model Category {
   type          TransactionType
   color         String          @default("#6366f1")
   icon          String?
-  subCategories SubCategory[]
-  transactions  Transaction[]
-  createdAt     DateTime        @default(now())
+  subCategories         SubCategory[]
+  transactions          Transaction[]
+  recurringTransactions RecurringTransaction[]
+  transactionSplits     TransactionSplit[]
+  budgets               CategoryBudget[]
+  createdAt             DateTime               @default(now())
   updatedAt     DateTime        @updatedAt
 
   @@unique([name, type])
@@ -51,9 +58,11 @@ model SubCategory {
   id           String        @id @default(cuid())
   name         String
   categoryId   String
-  category     Category      @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  category     Category              @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   transactions Transaction[]
-  createdAt    DateTime      @default(now())
+  recurringTransactions RecurringTransaction[]
+  transactionSplits     TransactionSplit[]
+  createdAt    DateTime              @default(now())
   updatedAt    DateTime      @updatedAt
 
   @@unique([name, categoryId])
@@ -75,6 +84,9 @@ model Transaction {
   description   String
   date          DateTime        @db.Date
   notes         String?
+  cleared         Boolean         @default(false)
+  splits          TransactionSplit[]
+  tags            TransactionTag[]
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
 
@@ -84,4 +96,78 @@ model Transaction {
   @@index([toAccountId])
   @@index([categoryId])
   @@index([subCategoryId])
+  @@index([cleared])
+}
+
+model Tag {
+  id           String           @id @default(cuid())
+  name         String           @unique
+  color        String           @default("#6366f1")
+  transactions TransactionTag[]
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+}
+
+model TransactionTag {
+  transactionId String
+  tagId         String
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  tag           Tag         @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([transactionId, tagId])
+  @@index([tagId])
+}
+
+model TransactionSplit {
+  id            String       @id @default(cuid())
+  transactionId String
+  transaction   Transaction  @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  categoryId    String
+  category      Category     @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  subCategoryId String?
+  subCategory   SubCategory? @relation(fields: [subCategoryId], references: [id], onDelete: SetNull)
+  amount        Decimal      @db.Decimal(12, 2)
+
+  @@index([transactionId])
+  @@index([categoryId])
+  @@index([subCategoryId])
+}
+
+model CategoryBudget {
+  id         String   @id @default(cuid())
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  year       Int
+  month      Int
+  amount     Decimal  @db.Decimal(12, 2)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([categoryId, year, month])
+  @@index([year, month])
+}
+
+model RecurringTransaction {
+  id              String          @id @default(cuid())
+  amount          Decimal         @db.Decimal(12, 2)
+  type            TransactionType
+  accountId       String
+  account         Account         @relation("RecurringAccount", fields: [accountId], references: [id], onDelete: Restrict)
+  toAccountId     String?
+  toAccount       Account?        @relation("RecurringTransferTo", fields: [toAccountId], references: [id], onDelete: Restrict)
+  categoryId      String?
+  category        Category?       @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  subCategoryId   String?
+  subCategory     SubCategory?    @relation(fields: [subCategoryId], references: [id], onDelete: SetNull)
+  description     String
+  notes           String?
+  dayOfMonth      Int
+  active          Boolean         @default(true)
+  lastPostedYear  Int?
+  lastPostedMonth Int?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@index([accountId])
+  @@index([active])
 }

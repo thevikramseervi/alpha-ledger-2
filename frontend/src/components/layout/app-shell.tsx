@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, ArrowLeftRight, Wallet, Menu, Landmark, Tags, Building2, TrendingUp } from "lucide-react";
+import { Wallet, Menu } from "lucide-react";
 import { Sidebar } from "./sidebar";
+import { navItems } from "./nav-items";
 import {
   Sheet,
   SheetContent,
@@ -12,15 +13,6 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
-
-const mobileNav = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/transactions", label: "Transactions", icon: ArrowLeftRight },
-  { href: "/accounts", label: "Accounts", icon: Landmark },
-  { href: "/categories", label: "Categories", icon: Tags },
-  { href: "/rental-income", label: "Rental Income", icon: Building2 },
-  { href: "/investments", label: "Investments", icon: TrendingUp },
-];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -49,7 +41,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   </SheetTitle>
                 </SheetHeader>
                 <nav className="flex flex-col gap-1 p-4">
-                  {mobileNav.map((item) => {
+                  {navItems.map((item) => {
                     const Icon = item.icon;
                     const active =
                       item.href === "/"
@@ -84,15 +76,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <p className="text-sm text-muted-foreground">
               {pathname === "/"
                 ? "Overview of your monthly finances"
-                : pathname.startsWith("/accounts")
-                  ? "Manage your cash and bank accounts"
-                  : pathname.startsWith("/categories")
-                    ? "Manage income, expense, and investment categories"
-                    : pathname.startsWith("/rental-income")
-                      ? "Track rent received from each property"
-                      : pathname.startsWith("/investments")
-                        ? "Track investments by category and account"
-                        : "Manage your transactions"}
+                : pathname.startsWith("/reports")
+                  ? "Long-range cash flow, categories, net worth, and budgets"
+                  : pathname.startsWith("/transactions")
+                  ? "Manage your transactions"
+                  : pathname.startsWith("/recurring")
+                    ? "Monthly templates for salary, rent, and SIP"
+                    : pathname.startsWith("/accounts")
+                      ? "Manage your cash and bank accounts"
+                      : pathname.startsWith("/categories")
+                        ? "Manage income, expense, and investment categories"
+                        : pathname.startsWith("/tags")
+                          ? "Label transactions for filters and reports"
+                          : pathname.startsWith("/rental-income")
+                          ? "Track rent received from each property"
+                          : pathname.startsWith("/investments")
+                            ? "Track investments by category and account"
+                            : "Manage your transactions"}
             </p>
           </div>
         </header>

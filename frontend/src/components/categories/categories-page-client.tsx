@@ -32,8 +32,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { api } from "@/lib/api";
-import { getApiErrorMessage, toastApiError } from "@/lib/api-error";
-import { trimOptional, trimRequired } from "@/lib/validation";
+import { getApiErrorMessage, logApiError, toastApiError } from "@/lib/api-error";
+import { MAX_NAME_LENGTH, trimOptional, trimRequired } from "@/lib/validation";
 import {
   CATEGORY_TYPES,
   DEFAULT_CATEGORY_COLOR,
@@ -116,7 +116,7 @@ export function CategoriesPageClient() {
       }
       setLoadError(getApiErrorMessage(error));
       toastApiError("Failed to load categories", error);
-      console.error(error);
+      logApiError("Categories load failed", error);
       return [];
     } finally {
       if (requestId === requestIdRef.current) {
@@ -180,7 +180,7 @@ export function CategoriesPageClient() {
         editing ? "Failed to update category" : "Failed to create category",
         error,
       );
-      console.error(error);
+      logApiError("Categories load failed", error);
     } finally {
       setSaving(false);
     }
@@ -197,7 +197,7 @@ export function CategoriesPageClient() {
       await loadCategories();
     } catch (error) {
       toastApiError("Failed to delete category", error);
-      console.error(error);
+      logApiError("Categories load failed", error);
     } finally {
       setDeleting(false);
     }
@@ -246,7 +246,7 @@ export function CategoriesPageClient() {
           : "Failed to create sub-category",
         error,
       );
-      console.error(error);
+      logApiError("Categories load failed", error);
     } finally {
       setSubCategorySaving(false);
     }
@@ -272,7 +272,7 @@ export function CategoriesPageClient() {
       }
     } catch (error) {
       toastApiError("Failed to delete sub-category", error);
-      console.error(error);
+      logApiError("Categories load failed", error);
     } finally {
       setDeletingSubCategory(false);
     }
@@ -346,10 +346,18 @@ export function CategoriesPageClient() {
         <PageLoading message="Loading categories..." />
       ) : loadError ? (
         <PageError message={loadError} onRetry={() => void loadCategories()} />
+      ) : categories.length === 0 && allCategories.length > 0 ? (
+        <div className="rounded-xl border border-dashed border-border/60 bg-card/30 px-6 py-16 text-center">
+          <Tags className="mx-auto mb-3 h-8 w-8 text-muted-foreground" />
+          <p className="text-sm font-medium">No categories match this filter</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Try another type filter or add a new category.
+          </p>
+        </div>
       ) : categories.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border/60 bg-card/30 px-6 py-16 text-center">
           <Tags className="mx-auto mb-3 h-8 w-8 text-muted-foreground" />
-          <p className="text-sm font-medium">No categories found</p>
+          <p className="text-sm font-medium">No categories yet</p>
           <p className="mt-1 text-sm text-muted-foreground">
             Add categories to classify your transactions.
           </p>
@@ -369,7 +377,11 @@ export function CategoriesPageClient() {
             <TableBody>
               {categories.map((category) => (
                 <TableRow key={category.id}>
-                  <TableCell className="font-medium">{category.name}</TableCell>
+                  <TableCell className="max-w-[220px]">
+                    <span className="block truncate font-medium" title={category.name}>
+                      {category.name}
+                    </span>
+                  </TableCell>
                   <TableCell>
                     <Badge
                       variant="outline"
@@ -448,6 +460,7 @@ export function CategoriesPageClient() {
                 id="categoryName"
                 placeholder="e.g. Groceries"
                 value={values.name}
+                maxLength={MAX_NAME_LENGTH}
                 onChange={(event) =>
                   setValues((current) => ({ ...current, name: event.target.value }))
                 }
@@ -558,6 +571,7 @@ export function CategoriesPageClient() {
                   : "New sub-category name"
               }
               value={subCategoryName}
+              maxLength={MAX_NAME_LENGTH}
               onChange={(event) => setSubCategoryName(event.target.value)}
               required
             />
@@ -624,7 +638,7 @@ export function CategoriesPageClient() {
       <Dialog
         open={!!deleteSubCategoryTarget}
         onOpenChange={(open) => {
-          if (!open) setDeleteSubCategoryTarget(null);
+          if (!open && !deletingSubCategory) setDeleteSubCategoryTarget(null);
         }}
       >
         <DialogContent className="sm:max-w-md">
@@ -632,7 +646,7 @@ export function CategoriesPageClient() {
             <DialogTitle>Delete sub-category</DialogTitle>
             <DialogDescription>
               Are you sure you want to delete{" "}
-              <span className="font-medium text-foreground">
+              <span className="break-all font-medium text-foreground line-clamp-2">
                 {deleteSubCategoryTarget?.name}
               </span>
               ? Existing transactions will keep their category but lose this
@@ -643,6 +657,7 @@ export function CategoriesPageClient() {
             <Button
               variant="outline"
               onClick={() => setDeleteSubCategoryTarget(null)}
+              disabled={deletingSubCategory}
             >
               Cancel
             </Button>
@@ -660,7 +675,7 @@ export function CategoriesPageClient() {
       <Dialog
         open={!!deleteTarget}
         onOpenChange={(open) => {
-          if (!open) setDeleteTarget(null);
+          if (!open && !deleting) setDeleteTarget(null);
         }}
       >
         <DialogContent className="sm:max-w-md">
@@ -668,14 +683,18 @@ export function CategoriesPageClient() {
             <DialogTitle>Delete category</DialogTitle>
             <DialogDescription>
               Are you sure you want to delete{" "}
-              <span className="font-medium text-foreground">
+              <span className="break-all font-medium text-foreground line-clamp-2">
                 {deleteTarget?.name}
               </span>
               ? Categories linked to transactions cannot be deleted.
             </DialogDescription>
           </DialogHeader>
           <div className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" onClick={() => setDeleteTarget(null)}>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteTarget(null)}
+              disabled={deleting}
+            >
               Cancel
             </Button>
             <Button variant="destructive" onClick={handleDelete} disabled={deleting}>

@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -59,7 +60,22 @@ export class CategoriesService {
   }
 
   async update(id: string, dto: UpdateCategoryDto) {
-    await this.findOne(id);
+    const existing = await this.findOne(id);
+
+    if (dto.type !== undefined && dto.type !== existing.type) {
+      const [transactionCount, recurringCount, splitCount] =
+        await Promise.all([
+          this.prisma.transaction.count({ where: { categoryId: id } }),
+          this.prisma.recurringTransaction.count({ where: { categoryId: id } }),
+          this.prisma.transactionSplit.count({ where: { categoryId: id } }),
+        ]);
+
+      if (transactionCount > 0 || recurringCount > 0 || splitCount > 0) {
+        throw new BadRequestException(
+          'Cannot change category type while it is linked to transactions or recurring items',
+        );
+      }
+    }
 
     return this.prisma.category.update({
       where: { id },
@@ -69,6 +85,19 @@ export class CategoriesService {
 
   async remove(id: string) {
     await this.findOne(id);
+
+    const [transactionCount, recurringCount, splitCount] = await Promise.all([
+      this.prisma.transaction.count({ where: { categoryId: id } }),
+      this.prisma.recurringTransaction.count({ where: { categoryId: id } }),
+      this.prisma.transactionSplit.count({ where: { categoryId: id } }),
+    ]);
+
+    if (transactionCount > 0 || recurringCount > 0 || splitCount > 0) {
+      throw new BadRequestException(
+        'Cannot delete a category linked to transactions or recurring items',
+      );
+    }
+
     await this.prisma.category.delete({ where: { id } });
     return { deleted: true };
   }

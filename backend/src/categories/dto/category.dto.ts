@@ -3,12 +3,14 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  MaxLength,
 } from 'class-validator';
 import { TransactionType } from '../../generated/prisma/client';
 
 export class CreateCategoryDto {
   @IsString()
   @IsNotEmpty()
+  @MaxLength(100)
   name: string;
 
   @IsEnum(TransactionType)
@@ -27,6 +29,7 @@ export class UpdateCategoryDto {
   @IsOptional()
   @IsString()
   @IsNotEmpty()
+  @MaxLength(100)
   name?: string;
 
   @IsOptional()

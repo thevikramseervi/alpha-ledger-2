@@ -17,7 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { api } from "@/lib/api";
-import { getApiErrorMessage, toastApiError } from "@/lib/api-error";
+import { getApiErrorMessage, logApiError, toastApiError } from "@/lib/api-error";
 import {
   formatCategoryLabel,
   formatCurrency,
@@ -76,7 +76,7 @@ export function InvestmentsPageClient() {
       }
       setLoadError(getApiErrorMessage(error));
       toastApiError("Failed to load investment data", error);
-      console.error(error);
+      logApiError("API request failed", error);
     } finally {
       if (requestId === requestIdRef.current) {
         setLoading(false);

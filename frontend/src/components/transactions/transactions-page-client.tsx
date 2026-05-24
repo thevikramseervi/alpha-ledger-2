@@ -1,6 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -12,29 +14,86 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { PageError, PageLoading } from "@/components/shared/async-state";
-import { MonthPicker } from "@/components/shared/month-picker";
 import { TransactionForm, TransactionFormValues } from "./transaction-form";
+import { TransactionFilters } from "./transaction-filters";
+import { RecurringDueBanner } from "@/components/recurring/recurring-due-banner";
 import { TransactionTable } from "./transaction-table";
 import { api } from "@/lib/api";
-import { getApiErrorMessage, toastApiError } from "@/lib/api-error";
-import { getCurrentPeriod, TRANSACTION_TYPE_LABELS } from "@/lib/format";
+import { exportTransactionsToCsv } from "@/lib/export-transactions-csv";
+import { getApiErrorMessage, logApiError, toastApiError } from "@/lib/api-error";
+import { getCurrentPeriod } from "@/lib/format";
 import { isValidTransactionAmount, trimOptional, trimRequired } from "@/lib/validation";
-import { Account, Category, Transaction, TransactionType } from "@/types";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Account, Category, RecurringTransaction, Tag, Transaction, TransactionType } from "@/types";
+
+const TRANSACTION_TYPES: TransactionType[] = [
+  "INCOME",
+  "EXPENSE",
+  "INVESTMENT",
+  "TRANSFER",
+];
+
+function parseTypeFilter(value: string | null): TransactionType | "ALL" {
+  if (value && TRANSACTION_TYPES.includes(value as TransactionType)) {
+    return value as TransactionType;
+  }
+  return "ALL";
+}
+
+function parsePeriodFromParams(
+  yearParam: string | null,
+  monthParam: string | null,
+) {
+  const year = Number(yearParam);
+  const month = Number(monthParam);
+  if (
+    Number.isInteger(year) &&
+    Number.isInteger(month) &&
+    year >= 1900 &&
+    year <= 2100 &&
+    month >= 1 &&
+    month <= 12
+  ) {
+    return { year, month };
+  }
+  return null;
+}
 
 export function TransactionsPageClient() {
-  const [{ year, month }, setPeriod] = useState(getCurrentPeriod);
-  const [typeFilter, setTypeFilter] = useState<TransactionType | "ALL">("ALL");
+  return (
+    <Suspense fallback={<PageLoading message="Loading transactions..." />}>
+      <TransactionsPageContent />
+    </Suspense>
+  );
+}
+
+function TransactionsPageContent() {
+  const searchParams = useSearchParams();
+  const initialPeriod =
+    parsePeriodFromParams(
+      searchParams.get("year"),
+      searchParams.get("month"),
+    ) ?? getCurrentPeriod();
+  const initialTypeFilter = parseTypeFilter(searchParams.get("type"));
+  const openRecurringReview = searchParams.get("recurring") === "review";
+
+  const [{ year, month }, setPeriod] = useState(initialPeriod);
+  const [typeFilter, setTypeFilter] = useState<TransactionType | "ALL">(
+    initialTypeFilter,
+  );
+  const [accountFilter, setAccountFilter] = useState("ALL");
+  const [categoryFilter, setCategoryFilter] = useState("ALL");
+  const [tagFilter, setTagFilter] = useState("ALL");
+  const [searchInput, setSearchInput] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [recurringItems, setRecurringItems] = useState<RecurringTransaction[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [tags, setTags] = useState<Tag[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
+  const [initialLoad, setInitialLoad] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [createFormKey, setCreateFormKey] = useState(0);
@@ -43,47 +102,155 @@ export function TransactionsPageClient() {
   const [deleting, setDeleting] = useState(false);
   const requestIdRef = useRef(0);
 
-  const loadData = useCallback(async () => {
+  useEffect(() => {
+    const period = parsePeriodFromParams(
+      searchParams.get("year"),
+      searchParams.get("month"),
+    );
+    if (period) {
+      setPeriod(period);
+    }
+    setTypeFilter(parseTypeFilter(searchParams.get("type")));
+  }, [searchParams]);
+
+  const usingCustomDateRange = Boolean(fromDate || toDate);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setSearchQuery(searchInput.trim());
+    }, 300);
+
+    return () => window.clearTimeout(timer);
+  }, [searchInput]);
+
+  const loadStaticData = useCallback(async () => {
+    try {
+      const [recurringData, categoryData, accountData, tagData] = await Promise.all([
+        api.recurringTransactions.list(),
+        api.categories.list(),
+        api.accounts.list(),
+        api.tags.list(),
+      ]);
+      setRecurringItems(recurringData);
+      setCategories(categoryData);
+      setAccounts(accountData);
+      setTags(tagData);
+    } catch (error) {
+      toastApiError("Failed to load transaction metadata", error);
+      logApiError("Transaction metadata load failed", error);
+    }
+  }, []);
+
+  const loadTransactions = useCallback(async () => {
+    if (fromDate && toDate && fromDate > toDate) {
+      setTransactions([]);
+      setLoadError("From date must be on or before to date");
+      setLoading(false);
+      setInitialLoad(false);
+      return;
+    }
+
     const requestId = ++requestIdRef.current;
     setLoading(true);
     setLoadError(null);
-    setTransactions([]);
 
     try {
-      const [txData, categoryData, accountData] = await Promise.all([
-        api.transactions.list({
-          year,
-          month,
-          type: typeFilter === "ALL" ? undefined : typeFilter,
-        }),
-        api.categories.list(),
-        api.accounts.list(),
-      ]);
+      const txData = await api.transactions.list({
+        ...(usingCustomDateRange
+          ? {
+              fromDate: fromDate || undefined,
+              toDate: toDate || undefined,
+            }
+          : { year, month }),
+        type: typeFilter === "ALL" ? undefined : typeFilter,
+        accountId: accountFilter === "ALL" ? undefined : accountFilter,
+        categoryId: categoryFilter === "ALL" ? undefined : categoryFilter,
+        tagId: tagFilter === "ALL" ? undefined : tagFilter,
+        search: searchQuery || undefined,
+      });
 
       if (requestId !== requestIdRef.current) {
         return;
       }
 
       setTransactions(txData);
-      setCategories(categoryData);
-      setAccounts(accountData);
     } catch (error) {
       if (requestId !== requestIdRef.current) {
         return;
       }
       setLoadError(getApiErrorMessage(error));
       toastApiError("Failed to load transactions", error);
-      console.error(error);
+      logApiError("Transaction list load failed", error);
     } finally {
       if (requestId === requestIdRef.current) {
         setLoading(false);
+        setInitialLoad(false);
       }
     }
-  }, [year, month, typeFilter]);
+  }, [
+    year,
+    month,
+    typeFilter,
+    accountFilter,
+    categoryFilter,
+    tagFilter,
+    searchQuery,
+    fromDate,
+    toDate,
+    usingCustomDateRange,
+  ]);
+
+  const loadData = useCallback(async () => {
+    await Promise.all([loadStaticData(), loadTransactions()]);
+  }, [loadStaticData, loadTransactions]);
 
   useEffect(() => {
-    void loadData();
-  }, [loadData]);
+    void loadStaticData();
+  }, [loadStaticData]);
+
+  useEffect(() => {
+    void loadTransactions();
+  }, [loadTransactions]);
+
+  const hasActiveFilters =
+    typeFilter !== "ALL" ||
+    accountFilter !== "ALL" ||
+    categoryFilter !== "ALL" ||
+    tagFilter !== "ALL" ||
+    searchInput.trim() !== "" ||
+    fromDate !== "" ||
+    toDate !== "";
+
+  const clearFilters = () => {
+    setTypeFilter("ALL");
+    setAccountFilter("ALL");
+    setCategoryFilter("ALL");
+    setTagFilter("ALL");
+    setSearchInput("");
+    setSearchQuery("");
+    setFromDate("");
+    setToDate("");
+  };
+
+  const handleExport = () => {
+    if (loadError) {
+      toast.error("Fix the load error before exporting");
+      return;
+    }
+
+    if (loading || transactions.length === 0) {
+      toast.error("No transactions to export");
+      return;
+    }
+
+    exportTransactionsToCsv(transactions, {
+      year,
+      month,
+      fromDate: fromDate || undefined,
+      toDate: toDate || undefined,
+    });
+    toast.success(`Exported ${transactions.length} transaction${transactions.length === 1 ? "" : "s"}`);
+  };
 
   const handleSubmit = async (values: TransactionFormValues) => {
     if (!values.type || !values.date || !isValidTransactionAmount(values.amount)) {
@@ -100,6 +267,28 @@ export function TransactionsPageClient() {
         notes: trimOptional(values.notes),
       };
 
+      const buildCategoryPayload = () => {
+        if (values.splitEnabled && values.splits.length >= 2) {
+          return {
+            splits: values.splits.map((split) => ({
+              categoryId: split.categoryId,
+              subCategoryId: split.subCategoryId || undefined,
+              amount: Number(split.amount),
+            })),
+            categoryId: null,
+            subCategoryId: null,
+          };
+        }
+
+        return {
+          categoryId: values.categoryId,
+          subCategoryId: values.subCategoryId ? values.subCategoryId : null,
+          splits: [],
+        };
+      };
+
+      const tagIds = values.tagIds.length > 0 ? values.tagIds : undefined;
+
       if (editing) {
         await api.transactions.update(
           editing.id,
@@ -109,12 +298,14 @@ export function TransactionsPageClient() {
                 toAccountId: values.toAccountId,
                 categoryId: null,
                 subCategoryId: null,
+                splits: [],
+                tagIds,
               }
             : {
                 ...base,
-                categoryId: values.categoryId,
-                subCategoryId: values.subCategoryId ? values.subCategoryId : null,
+                ...buildCategoryPayload(),
                 toAccountId: null,
+                tagIds,
               },
         );
         toast.success("Transaction updated");
@@ -124,12 +315,24 @@ export function TransactionsPageClient() {
             ? {
                 ...base,
                 toAccountId: values.toAccountId,
+                tagIds,
               }
-            : {
-                ...base,
-                categoryId: values.categoryId,
-                subCategoryId: values.subCategoryId || undefined,
-              },
+            : values.splitEnabled && values.splits.length >= 2
+              ? {
+                  ...base,
+                  splits: values.splits.map((split) => ({
+                    categoryId: split.categoryId,
+                    subCategoryId: split.subCategoryId || undefined,
+                    amount: Number(split.amount),
+                  })),
+                  tagIds,
+                }
+              : {
+                  ...base,
+                  categoryId: values.categoryId,
+                  subCategoryId: values.subCategoryId || undefined,
+                  tagIds,
+                },
         );
         toast.success("Transaction created");
       }
@@ -139,7 +342,7 @@ export function TransactionsPageClient() {
       await loadData();
     } catch (error) {
       toastApiError("Failed to save transaction", error);
-      console.error(error);
+      logApiError("Transaction save failed", error);
     }
   };
 
@@ -154,7 +357,7 @@ export function TransactionsPageClient() {
       await loadData();
     } catch (error) {
       toastApiError("Failed to delete transaction", error);
-      console.error(error);
+      logApiError("Transaction save failed", error);
     } finally {
       setDeleting(false);
     }
@@ -166,11 +369,19 @@ export function TransactionsPageClient() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Transactions</h1>
           <p className="text-sm text-muted-foreground">
-            Track income, expenses, and investments for the selected month.
+            Search, filter, and export your ledger. Manage recurring templates on{" "}
+            <Link href="/recurring" className="text-primary hover:underline">
+              Recurring
+            </Link>
+            .
           </p>
         </div>
         <Button
           onClick={() => {
+            if (accounts.length === 0) {
+              toast.error("Create an account on the Accounts page first");
+              return;
+            }
             setEditing(null);
             setCreateFormKey((current) => current + 1);
             setDialogOpen(true);
@@ -181,44 +392,66 @@ export function TransactionsPageClient() {
         </Button>
       </div>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <MonthPicker year={year} month={month} onChange={(y, m) => setPeriod({ year: y, month: m })} />
-        <Select
-          value={typeFilter}
-          onValueChange={(value) => {
-            if (!value) return;
-            setTypeFilter(value as TransactionType | "ALL");
-          }}
-        >
-          <SelectTrigger className="w-full sm:w-[180px]">
-            <SelectValue placeholder="Filter by type" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="ALL">All types</SelectItem>
-            {(Object.keys(TRANSACTION_TYPE_LABELS) as TransactionType[]).map(
-              (type) => (
-                <SelectItem key={type} value={type}>
-                  {TRANSACTION_TYPE_LABELS[type]}
-                </SelectItem>
-              ),
-            )}
-          </SelectContent>
-        </Select>
-      </div>
+      <RecurringDueBanner
+        year={year}
+        month={month}
+        recurringItems={recurringItems}
+        onChanged={loadData}
+        defaultReviewOpen={openRecurringReview}
+      />
 
-      {loading ? (
+      <TransactionFilters
+        year={year}
+        month={month}
+        onPeriodChange={(y, m) => setPeriod({ year: y, month: m })}
+        searchInput={searchInput}
+        onSearchInputChange={setSearchInput}
+        typeFilter={typeFilter}
+        onTypeFilterChange={setTypeFilter}
+        accountFilter={accountFilter}
+        onAccountFilterChange={setAccountFilter}
+        categoryFilter={categoryFilter}
+        onCategoryFilterChange={setCategoryFilter}
+        tagFilter={tagFilter}
+        onTagFilterChange={setTagFilter}
+        fromDate={fromDate}
+        onFromDateChange={setFromDate}
+        toDate={toDate}
+        onToDateChange={setToDate}
+        accounts={accounts}
+        categories={categories}
+        tags={tags}
+        hasActiveFilters={hasActiveFilters}
+        onClearFilters={clearFilters}
+        usingCustomDateRange={usingCustomDateRange}
+        onExport={handleExport}
+        exportDisabled={loading || !!loadError || transactions.length === 0}
+      />
+
+      {initialLoad && loading ? (
         <PageLoading message="Loading transactions..." />
-      ) : loadError ? (
+      ) : loadError && transactions.length === 0 ? (
         <PageError message={loadError} onRetry={() => void loadData()} />
       ) : (
-        <TransactionTable
-          transactions={transactions}
-          onEdit={(transaction) => {
-            setEditing(transaction);
-            setDialogOpen(true);
-          }}
-          onDelete={setDeleteTarget}
-        />
+        <>
+          {loading && (
+            <p className="text-sm text-muted-foreground">Updating transactions…</p>
+          )}
+          {loadError && (
+            <p className="text-sm text-destructive">{loadError}</p>
+          )}
+          <p className="text-sm text-muted-foreground">
+            {transactions.length} transaction{transactions.length === 1 ? "" : "s"} found
+          </p>
+          <TransactionTable
+            transactions={transactions}
+            onEdit={(transaction) => {
+              setEditing(transaction);
+              setDialogOpen(true);
+            }}
+            onDelete={setDeleteTarget}
+          />
+        </>
       )}
 
       <Dialog
@@ -238,6 +471,7 @@ export function TransactionsPageClient() {
             key={editing?.id ?? createFormKey}
             categories={categories}
             accounts={accounts}
+            tags={tags}
             initialData={editing ?? undefined}
             formKey={editing?.id ?? createFormKey}
             onSubmit={handleSubmit}
@@ -252,7 +486,7 @@ export function TransactionsPageClient() {
       <Dialog
         open={!!deleteTarget}
         onOpenChange={(open) => {
-          if (!open) setDeleteTarget(null);
+          if (!open && !deleting) setDeleteTarget(null);
         }}
       >
         <DialogContent className="sm:max-w-md">
@@ -260,14 +494,18 @@ export function TransactionsPageClient() {
             <DialogTitle>Delete transaction</DialogTitle>
             <DialogDescription>
               Are you sure you want to delete{" "}
-              <span className="font-medium text-foreground">
+              <span className="break-all font-medium text-foreground line-clamp-2">
                 {deleteTarget?.description}
               </span>
               ? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <div className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" onClick={() => setDeleteTarget(null)}>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteTarget(null)}
+              disabled={deleting}
+            >
               Cancel
             </Button>
             <Button variant="destructive" onClick={handleDelete} disabled={deleting}>

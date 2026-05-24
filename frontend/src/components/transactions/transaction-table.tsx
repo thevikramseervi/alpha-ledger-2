@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/table";
 import { Transaction } from "@/types";
 import {
+  formatCategoryLabel,
   formatCurrency,
   formatDate,
   formatTransferLabel,
@@ -73,31 +74,105 @@ export function TransactionTable({
                 </Badge>
               </TableCell>
               <TableCell>
-                {transaction.category?.name ?? (
+                {transaction.splits && transaction.splits.length >= 2 ? (
+                  <div className="space-y-1">
+                    <Badge variant="outline">Split ({transaction.splits.length})</Badge>
+                    <p className="max-w-[180px] truncate text-xs text-muted-foreground" title={transaction.splits
+                      .map((split) =>
+                        formatCategoryLabel(
+                          split.category.name,
+                          split.subCategory?.name,
+                        ),
+                      )
+                      .join(", ")}>
+                      {transaction.splits
+                        .map((split) =>
+                          formatCategoryLabel(
+                            split.category.name,
+                            split.subCategory?.name,
+                          ),
+                        )
+                        .join(", ")}
+                    </p>
+                  </div>
+                ) : transaction.category?.name ? (
+                  <span className="block max-w-[140px] truncate" title={transaction.category.name}>
+                    {transaction.category.name}
+                  </span>
+                ) : (
                   <span className="text-muted-foreground">—</span>
                 )}
               </TableCell>
               <TableCell>
-                {transaction.subCategory?.name ?? (
+                {transaction.splits && transaction.splits.length >= 2 ? (
+                  <span className="text-muted-foreground">—</span>
+                ) : transaction.subCategory?.name ? (
+                  <span
+                    className="block max-w-[140px] truncate"
+                    title={transaction.subCategory.name}
+                  >
+                    {transaction.subCategory.name}
+                  </span>
+                ) : (
                   <span className="text-muted-foreground">—</span>
                 )}
               </TableCell>
               <TableCell>
-                {transaction.type === "TRANSFER" && transaction.toAccount
-                  ? formatTransferLabel(
+                {transaction.type === "TRANSFER" && transaction.toAccount ? (
+                  <span
+                    className="block max-w-[180px] truncate"
+                    title={formatTransferLabel(
                       transaction.account.name,
                       transaction.toAccount.name,
-                    )
-                  : transaction.account.name}
+                    )}
+                  >
+                    {formatTransferLabel(
+                      transaction.account.name,
+                      transaction.toAccount.name,
+                    )}
+                  </span>
+                ) : (
+                  <span
+                    className="block max-w-[140px] truncate"
+                    title={transaction.account.name}
+                  >
+                    {transaction.account.name}
+                  </span>
+                )}
               </TableCell>
-              <TableCell>
+              <TableCell className="max-w-[220px]">
                 <div>
-                  <p className="font-medium">{transaction.description}</p>
+                  <p
+                    className="truncate font-medium"
+                    title={transaction.description}
+                  >
+                    {transaction.description}
+                  </p>
                   {transaction.notes && (
-                    <p className="text-xs text-muted-foreground">
+                    <p
+                      className="truncate text-xs text-muted-foreground"
+                      title={transaction.notes}
+                    >
                       {transaction.notes}
                     </p>
                   )}
+                  {transaction.tags && transaction.tags.length > 0 ? (
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {transaction.tags.map((link) => (
+                        <Badge
+                          key={link.tagId}
+                          variant="outline"
+                          className="text-[10px] font-normal"
+                          style={{
+                            borderColor: `${link.tag.color}55`,
+                            color: link.tag.color,
+                          }}
+                        >
+                          {link.tag.name}
+                        </Badge>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
               </TableCell>
               <TableCell>

@@ -1,5 +1,6 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { AllocationDonutChart } from "@/components/shared/allocation-donut-chart";
 import { InvestmentCategorySummary } from "@/types";
 import { formatCurrency } from "@/lib/format";
 
@@ -29,7 +30,19 @@ export function InvestmentCategoryBreakdown({
         {categories.filter((category) => category.total > 0).length === 0 ? (
           <p className="text-sm text-muted-foreground">{emptyMessage}</p>
         ) : (
-          categories
+          <>
+            <AllocationDonutChart
+              slices={categories
+                .filter((category) => category.total > 0)
+                .map((category) => ({
+                  id: category.categoryId ?? category.categoryName,
+                  name: category.categoryName,
+                  value: category.total,
+                  color: category.color,
+                }))}
+              emptyMessage={emptyMessage}
+            />
+            {categories
             .filter((category) => category.total > 0)
             .map((category) => {
             const categoryPercentage =
@@ -98,7 +111,8 @@ export function InvestmentCategoryBreakdown({
                 ) : null}
               </div>
             );
-          })
+          })}
+          </>
         )}
       </CardContent>
     </Card>

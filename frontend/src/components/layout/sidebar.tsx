@@ -2,25 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  LayoutDashboard,
-  ArrowLeftRight,
-  TrendingUp,
-  Wallet,
-  Landmark,
-  Tags,
-  Building2,
-} from "lucide-react";
+import { Wallet, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-const navItems = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/transactions", label: "Transactions", icon: ArrowLeftRight },
-  { href: "/accounts", label: "Accounts", icon: Landmark },
-  { href: "/categories", label: "Categories", icon: Tags },
-  { href: "/rental-income", label: "Rental Income", icon: Building2 },
-  { href: "/investments", label: "Investments", icon: TrendingUp },
-];
+import { navItems } from "./nav-items";
 
 export function Sidebar() {
   const pathname = usePathname();
