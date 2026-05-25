@@ -33,7 +33,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - **Charts:** shared colors in `src/lib/chart-theme.ts`; donuts via `allocation-donut-chart.tsx`
 - **Chart range:** `DashboardChartRange` = `'6m' | '12m' | 'ytd'` in `dashboard-analytics.ts`; reports also support custom dates via API
 - **Navigation:** shared `components/layout/nav-items.ts` — used by sidebar and mobile sheet
-- **Mobile web app metadata:** `app/manifest.ts`, `app/icon.tsx`, `app/apple-icon.tsx`, and `app/pwa-icon/route.tsx` provide Add-to-Home-Screen support; keep icons and metadata aligned if branding changes
+- **Mobile web app / offline:** `app/manifest.ts`, `app/icon.tsx`, `app/apple-icon.tsx`, `app/pwa-icon/route.tsx`, `public/sw.js`, and `components/pwa/*` provide Add-to-Home-Screen support plus offline read caching; keep icons, manifest, and service-worker behavior aligned
 
 ## Domain rules (do not break)
 
@@ -70,6 +70,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
   - Builder: `buildReportsWorkbook()` in `build-reports-xlsx.ts` — multi-sheet full export
 - Shared export fetch: `src/lib/reports-export/fetch-export-package.ts` → `api.reports.exportPackage(...)`
   - Backend must expose `rentalIncomePeriod` and `investmentSummaryPeriod` on export package
+- Offline policy: cache navigations and read-only GET API responses; do **not** queue or replay finance mutations offline unless the product explicitly changes
 
 ## Dev server
 

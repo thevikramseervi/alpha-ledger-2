@@ -97,9 +97,18 @@ Export: `src/lib/export-reports-csv.ts`, `src/lib/reports-pdf/` (PDF), `src/lib/
 | `app/icon.tsx` | Main app icon |
 | `app/apple-icon.tsx` | iOS home screen icon |
 | `app/pwa-icon/route.tsx` | Dynamic 192px / 512px PNGs for manifest icons |
+| `app/offline/page.tsx` | Offline fallback screen for navigations without network |
+| `components/pwa/pwa-registration.tsx` | Registers the service worker |
+| `components/pwa/network-status-banner.tsx` | Shows offline status in the UI |
+| `public/sw.js` | Service worker for app-shell / API caching |
 | `lib/pwa-icon.tsx` | Shared icon artwork for all generated icons |
 
-The app is not offline-first and does **not** register a service worker, but it now behaves like an installable mobile web app with proper iconography and theme metadata.
+Offline support is intentionally **read-first / safe-write**:
+
+- previously visited pages continue to open offline
+- cached `GET /api/*` responses are reused when the network is unavailable
+- mutations (`POST`, `PATCH`, `PUT`, `DELETE`) are **not** queued; they fail with a clear offline message to avoid finance data conflicts
+- there is no background sync yet
 
 #### PDF export (`src/lib/reports-pdf/`)
 
@@ -240,7 +249,7 @@ Typed methods for all backend resources. Notable:
 - `suppressHydrationWarning` on `<html>` / `<body>` for browser extension attributes
 - Reports **PDF export** — **Download full PDF** or **Summary PDF**; built client-side with `@react-pdf/renderer`
 - Reports **XLSX export** — **Download XLSX**; full multi-sheet workbook via SheetJS; same export-package API as PDF
-- Mobile install polish — manifest, generated icons, Apple touch icon, and safe-area aware header/content spacing
+- PWA support — manifest, generated icons, Apple touch icon, service worker registration, offline fallback page, cached read-only data, and safe-area aware header/content spacing
 
 ## Troubleshooting
 
@@ -253,6 +262,7 @@ Typed methods for all backend resources. Notable:
 | Select shows ID after pick | `SelectValue` needs a label render function — see existing forms |
 | LAN / phone access | Use `http://<laptop-ip>:3000`; set `DEV_ALLOWED_ORIGINS` if HMR fails |
 | PDF export slow or fails | Restart backend; large ranges (500+ transactions) take longer; check browser console |
+| Write action fails while offline | Expected — offline mode is read-only for data safety |
 
 ## Agent / IDE rules
 

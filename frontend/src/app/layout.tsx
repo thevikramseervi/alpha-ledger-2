@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { AppShell } from "@/components/layout/app-shell";
+import { NetworkStatusBanner } from "@/components/pwa/network-status-banner";
+import { PwaRegistration } from "@/components/pwa/pwa-registration";
 import "./globals.css";
 
 const inter = Inter({
@@ -52,6 +54,8 @@ export default function RootLayout({
         className="min-h-full bg-background font-sans text-foreground"
         suppressHydrationWarning
       >
+        <PwaRegistration />
+        <NetworkStatusBanner />
         <AppShell>{children}</AppShell>
         <Toaster richColors position="top-right" />
       </body>

@@ -64,6 +64,8 @@ PDF export is built **client-side** with `@react-pdf/renderer`. **XLSX export** 
 - Includes a **web app manifest**, generated app icons, and Apple touch icon
 - Install from your phone with **Add to Home Screen** for an app-like launcher icon
 - Uses dark status-bar / theme metadata and safe-area padding for notch / bottom-home-indicator devices
+- Registers a **service worker** for offline shell support and cached read-only API data
+- Offline mode is intentionally **read-only**: cached data stays available, but new writes are blocked until reconnect to avoid finance sync conflicts
 
 ### Transactions (`/transactions`)
 
@@ -477,6 +479,7 @@ npm run lint
 | `migrate dev` wants to reset DB | Use `npx prisma migrate deploy` to apply pending migrations only |
 | Reports custom range error | `fromDate` must be ≤ `toDate`; range capped at 24 months |
 | PDF export slow or fails | Restart backend after updates; large ranges (500+ txns) take longer; check browser console for render errors |
+| Change fails while offline | Expected — offline mode caches reads only; reconnect to create or edit finance data |
 | No categories on fresh DB | Expected — create categories in the app (only accounts are pre-inserted) |
 
 ## Scope (what this app is not)

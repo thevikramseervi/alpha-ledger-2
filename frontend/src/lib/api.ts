@@ -55,15 +55,31 @@ function getApiBaseUrl(): string {
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const apiKey = process.env.NEXT_PUBLIC_API_KEY;
-  const response = await fetch(`${getApiBaseUrl()}${path}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(apiKey ? { 'x-api-key': apiKey } : {}),
-      ...options?.headers,
-    },
-    cache: 'no-store',
-  });
+  let response: Response;
+
+  try {
+    response = await fetch(`${getApiBaseUrl()}${path}`, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(apiKey ? { 'x-api-key': apiKey } : {}),
+        ...options?.headers,
+      },
+      cache: 'no-store',
+    });
+  } catch (error) {
+    const offline =
+      typeof navigator !== 'undefined' && navigator.onLine === false;
+
+    throw new ApiError(
+      offline
+        ? 'You are offline. Cached data may still be available, but changes require a connection.'
+        : error instanceof Error
+          ? error.message
+          : 'Network request failed',
+      0,
+    );
+  }
 
   if (!response.ok) {
     const body = await response.text();
