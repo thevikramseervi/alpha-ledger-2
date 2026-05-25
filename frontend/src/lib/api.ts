@@ -1,5 +1,32 @@
 import { ApiError } from '@/lib/api-error';
 
+function isPrivateNetworkHost(hostname: string): boolean {
+  if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '0.0.0.0') {
+    return true;
+  }
+
+  const parts = hostname.split('.').map(Number);
+  if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) {
+    return false;
+  }
+
+  const [first, second] = parts;
+
+  if (first === 10) {
+    return true;
+  }
+
+  if (first === 172 && second >= 16 && second <= 31) {
+    return true;
+  }
+
+  if (first === 192 && second === 168) {
+    return true;
+  }
+
+  return false;
+}
+
 function getApiBaseUrl(): string {
   const configured = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api';
 
@@ -13,13 +40,17 @@ function getApiBaseUrl(): string {
     hostname === '127.0.0.1' ||
     hostname === '0.0.0.0';
 
-  // 0.0.0.0 in the URL bar is not routable — API calls must use localhost on this machine.
   if (isLocalMachine) {
     return configured;
   }
 
-  // When opened via LAN/hotspot IP (e.g. http://10.x.x.x:3000), call the API on the same host.
-  return `${protocol}//${hostname}:3001/api`;
+  // LAN dev only — phone on same Wi‑Fi hitting http://192.168.x.x:3000
+  if (process.env.NODE_ENV === 'development' && isPrivateNetworkHost(hostname)) {
+    return `${protocol}//${hostname}:3001/api`;
+  }
+
+  // Production (Vercel, custom domain, etc.) — always use configured API URL
+  return configured;
 }
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {

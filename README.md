@@ -245,6 +245,16 @@ There is **no seed script**. After migrating, open the app and:
 
 Categories are not seeded — only the three default accounts exist on a fresh database.
 
+## Deploy (access from your phone anywhere)
+
+See **[DEPLOY.md](./DEPLOY.md)** for step-by-step deployment:
+
+- **Neon** — database (you likely already have this)
+- **Railway** (or Render) — NestJS API
+- **Vercel** — Next.js frontend
+
+After deploy, open your Vercel URL on your phone and optionally **Add to Home Screen**.
+
 ## Environment variables
 
 ### Backend (`backend/.env`)
@@ -253,15 +263,15 @@ Categories are not seeded — only the three default accounts exist on a fresh d
 |----------|-------------|
 | `DATABASE_URL` | PostgreSQL connection string (Neon direct URL with `?sslmode=verify-full`, or local Docker URL) |
 | `PORT` | API port (default `3001`) |
-| `HOST` | Listen address — dev defaults to `0.0.0.0` for LAN; production uses `127.0.0.1` |
-| `FRONTEND_URL` | Primary CORS origin (default `http://localhost:3000`) |
+| `HOST` | Listen address (default `0.0.0.0` for dev and PaaS; set `127.0.0.1` only if behind a local reverse proxy) |
+| `FRONTEND_URL` | Primary CORS origin (default `http://localhost:3000`). Comma-separated for multiple deployed frontends |
 | `API_KEY` | Optional in dev; **required in production**. When set, all routes need `x-api-key` header |
 
 ### Frontend (`frontend/.env.local`)
 
 | Variable | Description |
 |----------|-------------|
-| `NEXT_PUBLIC_API_URL` | Backend API base URL (default `http://localhost:3001/api`) |
+| `NEXT_PUBLIC_API_URL` | Backend API base URL. **Required in production** (e.g. `https://your-api.up.railway.app/api`). Default `http://localhost:3001/api` for local dev |
 | `NEXT_PUBLIC_API_KEY` | Must match backend `API_KEY` when API is protected |
 | `DEV_ALLOWED_ORIGINS` | Extra hostnames for Next.js HMR on LAN/hotspot (comma-separated IPs) |
 
@@ -270,6 +280,8 @@ Categories are not seeded — only the three default accounts exist on a fresh d
 - Backend dev server binds to `0.0.0.0`; frontend uses `next dev --hostname 0.0.0.0`
 - Open the app from your phone using your laptop’s **real IP** (e.g. `http://192.168.x.x:3000`), not `0.0.0.0`
 - Set matching `API_KEY` / `NEXT_PUBLIC_API_KEY` if exposing the API on the network
+
+For **internet access from your phone**, deploy to Vercel + Railway — see [DEPLOY.md](./DEPLOY.md). LAN access above is dev-only.
 
 ## API overview
 
@@ -471,6 +483,7 @@ npm run lint
 
 ## Further reading
 
+- [DEPLOY.md](./DEPLOY.md) — deploy to Vercel + Railway for phone/anywhere access
 - [backend/README.md](./backend/README.md) — API and database development
 - [frontend/README.md](./frontend/README.md) — UI development
 - [frontend/AGENTS.md](./frontend/AGENTS.md) — notes for AI coding assistants

@@ -179,7 +179,7 @@ Reports month sequences: `getReportsMonthSequence()`, `getReportsMonthSequenceFr
 
 ## Security
 
-- **`API_KEY`** — optional in development; required in production. When set, `ApiKeyGuard` validates `x-api-key` with timing-safe comparison.
+- **`API_KEY`** — optional in development; **required in production**. When set, `ApiKeyGuard` validates `x-api-key` with timing-safe comparison. `GET /api/health` is public.
 - **CORS** — `FRONTEND_URL` plus private LAN IPs on port 3000 in development (`src/common/network-utils.ts`).
 - **No user accounts** — single shared database; API key is the only access control when enabled.
 
@@ -210,6 +210,7 @@ PATCH /api/transactions/:id           # body may include tagIds[], cleared, spli
 POST /api/recurring-transactions/:id/post   # { year, month }
 GET  /api/budgets/overview?year=2026&month=5
 PUT  /api/budgets/sync                # { year, month, budgets[] }
+GET  /api/health                          # Public health check (no API key)
 GET  /api/reports/overview?year=2026&month=5&range=12m
 GET  /api/reports/overview?fromDate=2026-01-01&toDate=2026-05-31
 GET  /api/reports/export-package?year=2026&month=5&range=12m

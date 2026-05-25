@@ -50,5 +50,6 @@ export function getListenHost(): string {
     return process.env.HOST;
   }
 
-  return process.env.NODE_ENV === 'production' ? '127.0.0.1' : '0.0.0.0';
+  // PaaS containers (Railway, Render, Fly) need 0.0.0.0; local prod behind nginx can set HOST=127.0.0.1
+  return '0.0.0.0';
 }
