@@ -18,9 +18,10 @@ WORKDIR /app
 ENV NODE_ENV=production
 
 COPY package.json package-lock.json ./
+COPY prisma.config.ts ./
 COPY prisma ./prisma/
 
-RUN npm ci --omit=dev
+RUN npm ci
 
 COPY --from=builder /app/dist ./dist
 
