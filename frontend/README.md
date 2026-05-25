@@ -89,6 +89,18 @@ Shared analytics helpers: `src/lib/dashboard-analytics.ts`.
 
 Export: `src/lib/export-reports-csv.ts`, `src/lib/reports-pdf/` (PDF), `src/lib/reports-xlsx/` (Excel), `src/lib/reports-export/` (shared fetch), `src/lib/reports-format.ts`.
 
+#### Mobile web app / PWA polish
+
+| File | Purpose |
+|------|---------|
+| `app/manifest.ts` | Web app manifest for install / Add to Home Screen |
+| `app/icon.tsx` | Main app icon |
+| `app/apple-icon.tsx` | iOS home screen icon |
+| `app/pwa-icon/route.tsx` | Dynamic 192px / 512px PNGs for manifest icons |
+| `lib/pwa-icon.tsx` | Shared icon artwork for all generated icons |
+
+The app is not offline-first and does **not** register a service worker, but it now behaves like an installable mobile web app with proper iconography and theme metadata.
+
 #### PDF export (`src/lib/reports-pdf/`)
 
 | File | Purpose |
@@ -197,6 +209,7 @@ src/
 │   ├── reports-pdf/                # Full + summary PDF export (@react-pdf/renderer)
 │   ├── reports-xlsx/               # Full Excel workbook export (xlsx)
 │   ├── reports-export/             # Shared export-package fetch
+│   ├── pwa-icon.tsx                # Shared generated app icon artwork
 │   ├── reports-format.ts           # Report period labels
 │   ├── format.ts        # INR formatting, date helpers, labels
 │   ├── reconciliation.ts
@@ -227,6 +240,7 @@ Typed methods for all backend resources. Notable:
 - `suppressHydrationWarning` on `<html>` / `<body>` for browser extension attributes
 - Reports **PDF export** — **Download full PDF** or **Summary PDF**; built client-side with `@react-pdf/renderer`
 - Reports **XLSX export** — **Download XLSX**; full multi-sheet workbook via SheetJS; same export-package API as PDF
+- Mobile install polish — manifest, generated icons, Apple touch icon, and safe-area aware header/content spacing
 
 ## Troubleshooting
 

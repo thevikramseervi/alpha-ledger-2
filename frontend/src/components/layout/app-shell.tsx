@@ -22,7 +22,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <Sidebar />
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-border/60 bg-background/80 px-4 backdrop-blur-xl lg:px-8">
+        <header
+          className="sticky top-0 z-40 flex items-center justify-between border-b border-border/60 bg-background/80 px-4 backdrop-blur-xl lg:px-8"
+          style={{
+            minHeight: "calc(4rem + env(safe-area-inset-top))",
+            paddingTop: "env(safe-area-inset-top)",
+          }}
+        >
           <div className="flex items-center gap-3 lg:hidden">
             <Sheet>
               <SheetTrigger
@@ -97,7 +103,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <main className="flex-1 px-4 py-6 lg:px-8 lg:py-8">{children}</main>
+        <main
+          className="flex-1 px-4 py-6 lg:px-8 lg:py-8"
+          style={{ paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }}
+        >
+          {children}
+        </main>
       </div>
     </div>
   );

@@ -33,6 +33,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - **Charts:** shared colors in `src/lib/chart-theme.ts`; donuts via `allocation-donut-chart.tsx`
 - **Chart range:** `DashboardChartRange` = `'6m' | '12m' | 'ytd'` in `dashboard-analytics.ts`; reports also support custom dates via API
 - **Navigation:** shared `components/layout/nav-items.ts` — used by sidebar and mobile sheet
+- **Mobile web app metadata:** `app/manifest.ts`, `app/icon.tsx`, `app/apple-icon.tsx`, and `app/pwa-icon/route.tsx` provide Add-to-Home-Screen support; keep icons and metadata aligned if branding changes
 
 ## Domain rules (do not break)
 

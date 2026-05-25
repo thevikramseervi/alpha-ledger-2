@@ -59,6 +59,12 @@ There is no `/dashboard` route — the dashboard is the home page (`/`).
 
 PDF export is built **client-side** with `@react-pdf/renderer`. **XLSX export** uses **SheetJS (`xlsx`)** with the same `GET /reports/export-package` payload. Large ranges (500+ transactions) may take a few seconds; export buttons show progress while fetching and building the file.
 
+### Mobile web app
+
+- Includes a **web app manifest**, generated app icons, and Apple touch icon
+- Install from your phone with **Add to Home Screen** for an app-like launcher icon
+- Uses dark status-bar / theme metadata and safe-area padding for notch / bottom-home-indicator devices
+
 ### Transactions (`/transactions`)
 
 - Create, edit, and delete transactions (delete uses a confirmation dialog)
@@ -253,7 +259,7 @@ See **[DEPLOY.md](./DEPLOY.md)** for step-by-step deployment:
 - **Railway** (or Render) — NestJS API
 - **Vercel** — Next.js frontend
 
-After deploy, open your Vercel URL on your phone and optionally **Add to Home Screen**.
+After deploy, open your Vercel URL on your phone and optionally **Add to Home Screen**. The app now includes installable web-app metadata and icons for a cleaner mobile launch experience.
 
 ## Environment variables
 
