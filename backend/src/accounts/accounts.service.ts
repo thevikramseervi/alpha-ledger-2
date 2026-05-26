@@ -188,7 +188,7 @@ export class AccountsService {
   }
 
   async update(id: string, dto: UpdateAccountDto) {
-    await this.findOne(id);
+    const existingAccount = await this.findOne(id);
 
     const transactionCount = await this.prisma.transaction.count({
       where: {
@@ -215,6 +215,35 @@ export class AccountsService {
       }
     }
 
+    const shouldRecalculateBalance =
+      hasTransactions &&
+      (dto.initialBalance !== undefined || dto.trackingStartDate !== undefined);
+
+    let recalculatedBalance: number | undefined;
+
+    if (shouldRecalculateBalance) {
+      const transactions = await this.loadNormalizedTransactions([id]);
+      const snapshotBalance =
+        dto.initialBalance !== undefined
+          ? dto.initialBalance
+          : Number(existingAccount.initialBalance);
+
+      const netEffect = transactions.reduce(
+        (total, transaction) =>
+          total +
+          getTransactionEffectOnAccount(
+            transaction.type,
+            transaction.amount,
+            id,
+            transaction.accountId,
+            transaction.toAccountId,
+          ),
+        0,
+      );
+
+      recalculatedBalance = snapshotBalance + netEffect;
+    }
+
     return this.prisma.account.update({
       where: { id },
       data: {
@@ -229,6 +258,9 @@ export class AccountsService {
               initialBalance: dto.initialBalance,
               ...(hasTransactions ? {} : { balance: dto.initialBalance }),
             }
+          : {}),
+        ...(recalculatedBalance !== undefined
+          ? { balance: recalculatedBalance }
           : {}),
       },
     });

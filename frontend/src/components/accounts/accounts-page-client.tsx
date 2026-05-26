@@ -715,7 +715,7 @@ export function AccountsPageClient() {
               />
               <p className="text-xs text-muted-foreground">
                 {editing
-                  ? "Updates the opening snapshot on monthly statements. Your live balance from transactions is unchanged."
+                  ? "Updates the starting snapshot and recalculates the live balance from all transactions on or after that date."
                   : "Account balance on the date above, before you add transactions."}
               </p>
             </div>
