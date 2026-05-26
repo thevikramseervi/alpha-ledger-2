@@ -66,13 +66,12 @@ export function getAccountBalanceAtMonthBoundaries(
     };
   }
 
-  const currentBalance = Number(account.balance);
   const storedInitialBalance = Number(account.initialBalance);
   const existedAtMonthStart = trackingStartKey <= monthStartKey;
   const activityStartKey = Math.max(monthStartKey, trackingStartKey);
 
-  let effectsFromMonthStart = 0;
-  let effectsAfterPeriodEnd = 0;
+  let effectsToPeriodEnd = 0;
+  let effectsBeforeMonthStart = 0;
   let incomeIn = 0;
   let transferIn = 0;
   let expenseOut = 0;
@@ -94,13 +93,14 @@ export function getAccountBalanceAtMonthBoundaries(
 
     const transactionKey = getCalendarDateKey(transaction.date);
 
-    if (transactionKey > periodEndKey) {
-      effectsAfterPeriodEnd += effect;
+    if (transactionKey < trackingStartKey || transactionKey > periodEndKey) {
       continue;
     }
 
-    if (transactionKey >= monthStartKey) {
-      effectsFromMonthStart += effect;
+    effectsToPeriodEnd += effect;
+
+    if (transactionKey < monthStartKey) {
+      effectsBeforeMonthStart += effect;
     }
 
     if (transactionKey >= activityStartKey) {
@@ -120,7 +120,7 @@ export function getAccountBalanceAtMonthBoundaries(
     }
   }
 
-  const closing = currentBalance - effectsAfterPeriodEnd;
+  const closing = storedInitialBalance + effectsToPeriodEnd;
   const moneyIn = incomeIn + transferIn;
   const moneyOut = expenseOut + investmentOut + transferOut;
   const transactionNet = moneyIn - moneyOut;
@@ -130,7 +130,7 @@ export function getAccountBalanceAtMonthBoundaries(
   let openingKind: AccountOpeningKind = 'CALENDAR';
 
   if (existedAtMonthStart) {
-    opening = currentBalance - effectsFromMonthStart - effectsAfterPeriodEnd;
+    opening = storedInitialBalance + effectsBeforeMonthStart;
   } else {
     openingKind = 'TRACKING_START';
     startingBalance =
